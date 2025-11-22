@@ -8,36 +8,26 @@ tags:
 
 
 <p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&height=240&text=📦Deep%20Learning%20Classification%20Project&fontSize=40&fontAlign=50&fontColor=28F2E6&color=0:9AD6FF,50:C1A6FF,100:CFF7E6&desc=A%20Clean%20and%20Flexible%20PyTorch%20Classification%20Pipeline&descAlign=50&descAlignY=78&descSize=18&descColor=C8EFF0"/>
+  <img src="https://capsule-render.vercel.app/api?type=waving&height=240&text=📦Deep%20Learning%20Classification%20Project&fontSize=40&fontAlign=50&fontColor=28F2E6&color=0:9AD6FF,50:C1A6FF,100:CFF7E6&desc=A%20Clean%20and%20Flexible%20PyTorch%20Classification%20Pipeline&descAlign=50&descAlignY=78&descSize=18&descColor=C8EFF0&animation=twinkling"/>
+</p>
+
+
+
+
+
+<p align="center">
+  <img src="https://capsule-render.vercel.app/api?type=waving&height=240&text=📦Deep%20Learning%20Classification%20Project&fontSize=42&fontAlign=50&fontColor=C7FFF0&color=0:7AD0FF,50:8A6BFF,100:8EF6C2&desc=A%20Clean%20and%20Flexible%20PyTorch%20Classification%20Pipeline&descAlign=50&descAlignY=78&descSize=20&descColor=D6C8F9&animation=twinkling"/>
 </p>
 
 
 
 <p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&height=240
-  &text=📦Deep%20Learning%20Classification%20Project
-  &fontSize=42&fontAlign=50&fontColor=C7FFF0
-  &color=0:7AD0FF,50:8A6BFF,100:8EF6C2
-  &desc=A%20Clean%20and%20Flexible%20PyTorch%20Classification%20Pipeline
-  &descAlign=50&descAlignY=78&descSize=20&descColor=D6C8F9"/>
+  <img src="https://capsule-render.vercel.app/api?type=waving&height=240&text=📦Deep%20Learning%20Classification%20Project&fontSize=42&fontAlign=50&fontColor=7FFFD4&color=0:0B2447,50:5B2B8A,100:00A586&desc=A%20Clean%20and%20Flexible%20PyTorch%20Classification%20Pipeline&descAlign=50&descAlignY=78&descSize=18&descColor=B1FBE4&animation=twinkling"/>
 </p>
 
 
 
-<p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&height=240&text=📦Deep%20Learning%20Classification%20Project&fontSize=42&fontAlign=50&fontColor=B8FCE6&color=0:2F80ED,50:9055FF,100:00C9FF&desc=A%20Clean%20and%20Flexible%20PyTorch%20Classification%20Pipeline&descAlign=50&descAlignY=78&descSize=20&descColor=B2EBF2" alt="Mystic Aurora Theme"/>
-</p>
 
-
-
-<p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&height=240
-  &text=📦Deep%20Learning%20Classification%20Project
-  &fontSize=42&fontAlign=50&fontColor=7FFFD4
-  &color=0:0B2447,50:5B2B8A,100:00A586
-  &desc=A%20Clean%20and%20Flexible%20PyTorch%20Classification%20Pipeline
-  &descAlign=50&descAlignY=78&descSize=18&descColor=B1FBE4"/>
-</p>
 
 
 
