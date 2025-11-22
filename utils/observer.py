@@ -1,0 +1,287 @@
+import torch
+import torchvision
+import torch.nn as nn
+from pathlib import Path
+from torchmetrics import (
+    Accuracy, Recall, Precision, Specificity, F1Score,
+    ConfusionMatrix, AUROC, MetricCollection, CohenKappa
+)
+from torch.utils.tensorboard import SummaryWriter
+from typing import Literal
+
+
+class EarlyStopping:
+    """Early stops the training if validation accuracy doesn't improve after a given patience."""
+    def __init__(self, patience=7, verbose=False):
+        """
+        Args:
+            patience (int): How long to wait after last time validation metric improved.
+            verbose (bool): Print message when early stopping is triggered.
+        """
+        self.patience = patience
+        self.verbose = verbose
+        self.counter = 0
+        self.best_score = None
+        self.early_stop = False
+
+    def __call__(self, score):
+        if self.best_score is None:
+            self.best_score = score
+        elif score < self.best_score:
+            self.counter += 1
+            if self.verbose:
+                print(f"EarlyStopping counter: {self.counter} / {self.patience}")
+            if self.counter >= self.patience:
+                self.early_stop = True
+        else:
+            self.best_score = score
+            self.counter = 0
+
+
+class RuntimeObserver:
+    """Observer for monitoring training/validation metrics, logging, and early stopping."""
+
+    def __init__(self, log_dir, device, num_classes=2,
+                 task: Literal["binary", "multiclass"] = "multiclass",
+                 average: Literal["micro", "macro", "weighted", "none"] = "micro",
+                 patience: int = 50, **kwargs):
+        """
+        :param log_dir: Directory to save logs and model weights
+        :param device: torch.device
+        :param num_classes: Number of output classes
+        :param task: 'binary' or 'multiclass'
+        :param average: Averaging mode for metrics
+        :param patience: Early stopping patience
+        :param kwargs: Optional metadata (experiment name, random seed)
+        """
+        self.log_dir = str(log_dir)
+        self.log_file = self.log_dir + 'log.txt'
+        self._kwargs = {
+            'name': kwargs.get('name', 'None'),
+            'seed': kwargs.get('seed', 'None')
+        }
+        self.device = device
+        self.task = task
+
+        # 初始化 best 记录
+        self.best_dicts = {
+            'epoch': 0, 'confusionMatrix': None, 'Accuracy': 0.,
+            'Recall': 0., 'Precision': 0., 'Specificity': 0., 'BalanceAccuracy': 0.,
+            'F1': 0., 'AuRoc': 0., 'CohenKappa': 0.
+        }
+
+        # ========== Metrics ========== #
+        self.train_metric_collection = MetricCollection({
+            'confusionMatrix': ConfusionMatrix(num_classes=num_classes, task=task).to(device),
+            'Accuracy': Accuracy(num_classes=num_classes, task=task).to(device),
+            'Precision': Precision(num_classes=num_classes, task=task, average=average).to(device),
+            'Recall': Recall(num_classes=num_classes, task=task, average=average).to(device),
+            'Specificity': Specificity(num_classes=num_classes, task=task, average=average).to(device),
+            'F1': F1Score(num_classes=num_classes, task=task, average=average).to(device),
+            'CohenKappa': CohenKappa(num_classes=num_classes, task=task).to(device)
+        }).to(device)
+
+        self.eval_metric_collection = MetricCollection({
+            'confusionMatrix': ConfusionMatrix(num_classes=num_classes, task=task).to(device),
+            'Accuracy': Accuracy(num_classes=num_classes, task=task).to(device),
+            'Precision': Precision(num_classes=num_classes, task=task, average=average).to(device),
+            'Recall': Recall(num_classes=num_classes, task=task, average=average).to(device),
+            'Specificity': Specificity(num_classes=num_classes, task=task, average=average).to(device),
+            'F1': F1Score(num_classes=num_classes, task=task, average=average).to(device),
+            'CohenKappa': CohenKappa(num_classes=num_classes, task=task).to(device)
+        }).to(device)
+
+        self.test_metric_collection = MetricCollection({
+            'confusionMatrix': ConfusionMatrix(num_classes=num_classes, task=task).to(device),
+            'Accuracy': Accuracy(num_classes=num_classes, task=task).to(device),
+            'Precision': Precision(num_classes=num_classes, task=task, average=average).to(device),
+            'Recall': Recall(num_classes=num_classes, task=task, average=average).to(device),
+            'Specificity': Specificity(num_classes=num_classes, task=task, average=average).to(device),
+            'F1': F1Score(num_classes=num_classes, task=task, average=average).to(device),
+            'CohenKappa': CohenKappa(num_classes=num_classes, task=task).to(device)
+        }).to(device)
+
+        self.compute_train_auc = AUROC(num_classes=num_classes, task=task).to(device)
+        self.compute_eval_auc = AUROC(num_classes=num_classes, task=task).to(device)
+        self.compute_test_auc = AUROC(num_classes=num_classes, task=task).to(device)
+
+        # 初始化日志与早停
+        self.summary = SummaryWriter(log_dir=self.log_dir + 'summary')
+        self.early_stopping = EarlyStopping(patience=patience, verbose=True)
+        self.log(f"Experiment: {self._kwargs['name']} | Seed: {self._kwargs['seed']}")
+
+        # 初始化统计
+        self.reset()
+
+    # ============================== #
+    # ---------- UTILITIES ---------- #
+    # ============================== #
+    def log(self, info: str):
+        print(info)
+        with open(self.log_file, 'a', encoding='utf-8') as f:
+            f.write(info + '\n')
+
+    def reset(self):
+        """Reset all epoch-wise statistics."""
+        self.total_train_loss = 0.
+        self.average_train_loss = 0.
+        self.train_metric = {}
+        self.train_metric_collection.reset()
+        self.compute_train_auc.reset()
+        self.train_auc = 0.
+        self.train_balance_accuracy = 0.
+
+        self.total_eval_loss = 0.
+        self.average_eval_loss = 0.
+        self.eval_metric = {}
+        self.eval_metric_collection.reset()
+        self.compute_eval_auc.reset()
+        self.eval_auc = 0.
+        self.eval_balance_accuracy = 0.
+
+        self.total_test_loss = 0.
+        self.average_test_loss = 0.
+        self.test_metric = {}
+        self.test_metric_collection.reset()
+        self.compute_test_auc.reset()
+        self.test_auc = 0.
+        self.test_balance_accuracy = 0.
+
+
+    def train_update(self, loss, prob, prediction, label):
+        """Update training metrics."""
+        if self.task == 'binary':
+            prob_positive = prob[:, 1]
+        else:
+            prob_positive = prob
+        self.total_train_loss += loss.item()
+        self.train_metric_collection.update(prediction, label)
+        self.compute_train_auc.update(prob_positive, label)
+
+    def eval_update(self, loss, prob, prediction, label):
+        """Update evaluation metrics."""
+        if self.task == 'binary':
+            prob_positive = prob[:, 1]
+        else:
+            prob_positive = prob
+        self.total_eval_loss += loss.item()
+        self.eval_metric_collection.update(prediction, label)
+        self.compute_eval_auc.update(prob_positive, label)
+    
+    def test_update(self, loss, prob, prediction, label):
+        """Update test metrics."""
+        if self.task == 'binary':
+            prob_positive = prob[:, 1]
+        else:
+            prob_positive = prob
+        self.total_test_loss += loss.item()
+        self.test_metric_collection.update(prediction, label)
+        self.compute_test_auc.update(prob_positive, label)
+
+
+    def compute_result(self, epoch, train_dataset_length, eval_dataset_length):
+        """Compute metrics for the epoch and log to TensorBoard."""
+        self.average_train_loss = self.total_train_loss / train_dataset_length
+        self.average_eval_loss = self.total_eval_loss / eval_dataset_length
+
+        self.train_metric = self.train_metric_collection.compute()
+        self.eval_metric = self.eval_metric_collection.compute()
+
+        self.train_auc = self.compute_train_auc.compute()
+        self.eval_auc = self.compute_eval_auc.compute()
+
+        self.train_balance_accuracy = (self.train_metric['Recall'] + self.train_metric['Specificity']) / 2.0
+        self.eval_balance_accuracy = (self.eval_metric['Recall'] + self.eval_metric['Specificity']) / 2.0
+
+        # TensorBoard logging
+        self.summary.add_scalar('Loss/train', self.average_train_loss, epoch)
+        self.summary.add_scalar('Loss/val', self.average_eval_loss, epoch)
+        self.summary.add_scalar('Eval/Accuracy', self.eval_metric['Accuracy'], epoch)
+        self.summary.add_scalar('Eval/F1', self.eval_metric['F1'], epoch)
+        self.summary.add_scalar('Eval/AUC', self.eval_auc, epoch)
+        self.summary.add_scalar('Eval/BalanceAcc', self.eval_balance_accuracy, epoch)
+        self.summary.add_scalar('Eval/CohenKappa', self.eval_metric['CohenKappa'], epoch)
+
+    def print_result(self, e, epochs):
+        """Print results for the current epoch."""
+        msg_train = (
+            f"Epoch [{e}/{epochs}] Train | Loss={self.average_train_loss:.4f}\n"
+            f"ConfusionMatrix:\n{self.train_metric['confusionMatrix']}\n"
+            f"Acc={self.train_metric['Accuracy']:.4f}, Pre={self.train_metric['Precision']:.4f}, "
+            f"Rec={self.train_metric['Recall']:.4f}, Spe={self.train_metric['Specificity']:.4f}, "
+            f"F1={self.train_metric['F1']:.4f}, Kappa={self.train_metric['CohenKappa']:.4f}, "
+            f"BalAcc={self.train_balance_accuracy:.4f}, AUC={self.train_auc:.4f}\n"
+        )
+        msg_eval = (
+            f"Epoch [{e}/{epochs}] Eval | Loss={self.average_eval_loss:.4f}\n"
+            f"ConfusionMatrix:\n{self.eval_metric['confusionMatrix']}\n"
+            f"Acc={self.eval_metric['Accuracy']:.4f}, Pre={self.eval_metric['Precision']:.4f}, "
+            f"Rec={self.eval_metric['Recall']:.4f}, Spe={self.eval_metric['Specificity']:.4f}, "
+            f"F1={self.eval_metric['F1']:.4f}, Kappa={self.eval_metric['CohenKappa']:.4f}, "
+            f"BalAcc={self.eval_balance_accuracy:.4f}, AUC={self.eval_auc:.4f}\n"
+        )
+        self.log(msg_train)
+        self.log(msg_eval)
+
+    def get_best(self, epoch):
+        """Record best metrics."""
+        self.best_dicts['epoch'] = epoch
+        self.best_dicts['confusionMatrix'] = self.eval_metric['confusionMatrix']
+        self.best_dicts['Accuracy'] = self.eval_metric['Accuracy']
+        self.best_dicts['Recall'] = self.eval_metric['Recall']
+        self.best_dicts['Precision'] = self.eval_metric['Precision']
+        self.best_dicts['Specificity'] = self.eval_metric['Specificity']
+        self.best_dicts['BalanceAccuracy'] = self.eval_balance_accuracy
+        self.best_dicts['F1'] = self.eval_metric['F1']
+        self.best_dicts['CohenKappa'] = self.eval_metric['CohenKappa']
+        self.best_dicts['AuRoc'] = self.eval_auc
+
+    def execute(self, e, epochs, train_len, eval_len, fold, model=None):
+        """Compute metrics, print, check early stopping, and save best model."""
+        self.compute_result(e, train_len, eval_len)
+        self.print_result(e, epochs)
+
+        # 更新最佳模型
+        if self.eval_balance_accuracy > self.best_dicts['BalanceAccuracy']:
+            self.get_best(e)
+            if model is not None:
+                model_save_path = self.log_dir + f'{self._kwargs["name"]}_best_model_fold{fold}.pth'
+                torch.save(model.state_dict(), model_save_path)
+                self.log(f"✅ Best model saved to {model_save_path}\n")
+
+        # Early stopping
+        self.early_stopping(self.eval_metric['Accuracy'])
+        return self.early_stopping.early_stop
+    
+    def compute_test_result(self, test_dataset_length):
+        """Compute test metrics."""
+        self.average_test_loss = self.total_test_loss / test_dataset_length
+
+        self.test_metric = self.test_metric_collection.compute()
+        self.test_auc = self.compute_test_auc.compute()
+        self.test_balance_accuracy = (self.test_metric['Recall'] + self.test_metric['Specificity']) / 2.0
+        self.test_metric['AuRoc'] = self.test_auc
+        self.test_metric['BalanceAccuracy'] = self.test_balance_accuracy
+        
+        msg_test = (
+            f"Test Results | Loss={self.average_test_loss:.4f}\n"
+            f"ConfusionMatrix:\n{self.test_metric['confusionMatrix']}\n"
+            f"Acc={self.test_metric['Accuracy']:.4f}, Pre={self.test_metric['Precision']:.4f}, "
+            f"Rec={self.test_metric['Recall']:.4f}, Spe={self.test_metric['Specificity']:.4f}, "
+            f"F1={self.test_metric['F1']:.4f}, Kappa={self.test_metric['CohenKappa']:.4f}, "
+            f"BalAcc={self.test_balance_accuracy:.4f}, AUC={self.test_auc:.4f}\n"
+        )
+        self.log(msg_test)
+    
+
+    def finish(self, fold):
+        """Log best result summary."""
+        best = self.best_dicts
+        msg = (
+            f"==== Fold {fold} Best Epoch {best['epoch']} ====\n"
+            f"Acc={best['Accuracy']:.4f}, Pre={best['Precision']:.4f}, Rec={best['Recall']:.4f}, "
+            f"Spe={best['Specificity']:.4f}, Kappa={best['CohenKappa']:.4f}\n"
+            f"BalAcc={best['BalanceAccuracy']:.4f}, F1={best['F1']:.4f}, AUC={best['AuRoc']:.4f}\n"
+            f"ConfusionMatrix:\n{best['confusionMatrix']}\n"
+        )
+        self.log(msg)
