@@ -1,3 +1,12 @@
+---
+date: 2025-11-23T16:09:00  
+tags:
+  - python
+  - deep learning
+  - image classification
+  - Oxford102Flowers
+---
+
 
 
 # Oxford 102 Flowers 图像分类实验结果
@@ -94,13 +103,21 @@ Estimated FLOPs (2*MACs): 7359117516.0
 
 *在此描述你对模型做的特殊修改，例如添加了 Attention 模块，修改了 Dropout 率等。*
 
-## 4. 训练细节 (Training Details)
+## 4. 训练细节、超参数
+
+ (Training Details and Hyperparameter)
+
+
 
 **Epoch:**  2000， **Batch Size:**  64， **Learning Rate:** 0.0001， **Weight Decay:**  0.002
 
+
+
 **Optimizer:**
 
-`AdamW(model.parameters(),lr=args.lr,weight_decay=args.weight_decay)`
+```python
+AdamW(model.parameters(),lr=args.lr,weight_decay=args.weight_decay)
+```
 
 **LR Scheduler:**
 
@@ -118,15 +135,29 @@ scheduler = lr_scheduler.OneCycleLR(
         )
 ```
 
+> 📌 OneCycleLR 可有效替代传统学习率衰减策略，兼顾快速收敛与稳定训练。
+
+
+
 **Loss Function：**
 
 ```python
 criterion = nn.CrossEntropyLoss(label_smoothing=0.1).to(device)
 ```
 
+> 使用 **带 Label Smoothing 的交叉熵损失（CrossEntropyLoss）**，能够缓解模型过自信、提升泛化能力，尤其在数据噪声较多或类别不均衡时效果显著。
 
 
-**其他策略：**  Early Stopping, Gradient Clipping
+
+**其他策略：**  
+
+
+
+| 策略                  | 说明                                                         |
+| :-------------------- | :----------------------------------------------------------- |
+| **Early Stopping**    | (patience = 200), 监控验证指标，若连续 **200 个 Epoch** 无提升则提前停止训练，防止过拟合 |
+| **Gradient Clipping** | 对梯度进行裁剪，防止梯度爆炸，提升训练稳定性                 |
+| **数据加载并行**      | (num_workers = 4), 使用 **4 个 DataLoader Worker** 加速数据读取与增强 |
 
 
 
