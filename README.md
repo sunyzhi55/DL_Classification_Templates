@@ -74,10 +74,12 @@ project/
 │   └── ...                # 支持无缝添加新架构
 ├── engine/            
 │   └── trainer.py         # 训练/验证核心逻辑（含早停、调度器等）
-├── utils/             
+├── experiment_results/    # 记录每次实验的日志
+├── utils/
 │   ├── basic.py           # 学习率调度、设备设置等基础工具
-│   ├── observer.py        # 日志记录、指标跟踪、TensorBoard 支持
 │   └── loss_function.py   # 自定义损失函数（如 LabelSmoothing）
+│   ├── model_stats.py     # 模型参数与 FLOPs 计算工具
+│   ├── observer.py        # 日志记录、指标跟踪、TensorBoard 支持
 ├── main.py                # 主训练入口
 ├── infer.py               # 单图/批量推理脚本
 ├── test.py                # 模型评估脚本（准确率、混淆矩阵等）
@@ -97,11 +99,13 @@ project/
 - **Pillow**（图像处理）
 - **NumPy**
 - **tqdm, tensorboard**（可选，用于进度条与日志可视化）
+ - **matplotlib, seaborn**（用于保存混淆矩阵可视化）
+ - **ptflops**（用于计算模型 FLOPs / MACs）
 
 推荐使用 `conda` 或 `venv` 创建独立环境：
 
 ```bash
-pip install torch torchvision scikit-learn pillow numpy tqdm tensorboard
+pip install torch torchvision scikit-learn pillow numpy tqdm tensorboard matplotlib seaborn ptflops
 ```
 
 ---
@@ -195,6 +199,45 @@ python infer.py \
 > 所有模型均支持 ImageNet 预训练权重加载（若可用）。
 
 ---
+
+## 📐 模型参数与 FLOPs 计算
+
+项目提供了一个轻量工具用于计算模型参数（Params）和 FLOPs（基于 MACs）：
+
+- 脚本路径：`utils/model_stats.py`
+- 依赖：`ptflops`
+
+示例用法：
+```powershell
+python -m utils.model_stats --num_classes 102 --img_size 224 --device cpu --output outputs/model_stats.txt
+```
+
+---
+
+## ✅ 模型评估（混淆矩阵可视化）
+
+使用 `test.py` 运行模型在测试集上的评估。脚本会在指定的 `--save_dir`（脚本运行时会带时间戳生成子目录）下保存一个混淆矩阵的 PNG 图像，文件名格式类似：
+
+```
+{exp_name}_confusion_foldtest.png
+```
+
+说明：如果没有显式传入 `--exp_name` 或 observer 的 `name`，文件名前缀可能为 `None` 或 `exp`。图像默认为按真实类别行归一化的视图（显示每类的召回率分布以及每个格子的绝对样本数）。
+
+示例运行：
+
+```bash
+python test.py --data_dir /your/image/root --test_label_file_path /path/to/test.txt \
+  --checkpoint best_model.pth --batch_size 64 --num_workers 4 --num_classes 102 --save_dir ./test_outputs
+```
+
+---
+
+## 💳 `experiment_results` 目录说明
+用于保存每次实验的日志、模型权重和配置备份。
+
+以`markdown`格式记录每次实验的关键指标，便于对比和复现。
+
 
 ## 🛠️ 扩展指南
 

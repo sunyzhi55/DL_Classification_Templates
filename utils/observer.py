@@ -2,6 +2,11 @@ import torch
 import torchvision
 import torch.nn as nn
 from pathlib import Path
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import seaborn as sns
 from torchmetrics import (
     Accuracy, Recall, Precision, Specificity, F1Score,
     ConfusionMatrix, AUROC, MetricCollection, CohenKappa
@@ -272,6 +277,14 @@ class RuntimeObserver:
             f"BalAcc={self.test_balance_accuracy:.4f}, AUC={self.test_auc:.4f}\n"
         )
         self.log(msg_test)
+        # 保存测试集的混淆矩阵图像（归一化视图，带注释）
+        cm = self.test_metric.get('confusionMatrix', None)
+        if cm is not None:
+            try:
+                # 使用更加友好的可视化（按需归一化并显示标签）
+                self._save_confusion_matrix(cm, fold='test', normalize=True)
+            except Exception as e:
+                self.log(f"Failed to save test confusion matrix: {e}")
     
 
     def finish(self, fold):
@@ -285,3 +298,91 @@ class RuntimeObserver:
             f"ConfusionMatrix:\n{best['confusionMatrix']}\n"
         )
         self.log(msg)
+        # 保存混淆矩阵为图片（每折）
+        cm = best.get('confusionMatrix', None)
+        if cm is not None:
+            try:
+                self._save_confusion_matrix(cm, fold)
+            except Exception as e:
+                self.log(f"Failed to save confusion matrix for fold {fold}: {e}")
+    def _save_confusion_matrix(self, cm, fold, class_names=None, normalize=False, figsize=(10, 8), cmap='Blues'):
+        """Save confusion matrix heatmap to disk with options.
+
+        Args:
+            cm: confusion matrix (torch.Tensor or numpy array)
+            fold: fold identifier (int or str)
+            class_names: list of class label names (optional)
+            normalize: whether to normalize rows (recall-normalized)
+            figsize: figure size
+            cmap: colormap
+        """
+        # 转为 numpy
+        if isinstance(cm, torch.Tensor):
+            cm = cm.detach().cpu().numpy()
+        cm = np.array(cm)
+
+        # 如果是多维（例如 torchmetrics 可能返回 NxN），确保是二维
+        if cm.ndim != 2:
+            cm = cm.reshape((cm.shape[0], -1))
+
+        num_classes = cm.shape[0]
+
+        # 计算归一化矩阵（按真实标签行归一化，表示召回率分布）
+        cm_display = cm.astype(float)
+        if normalize:
+            with np.errstate(all='ignore'):
+                row_sums = cm_display.sum(axis=1, keepdims=True)
+                cm_norm = np.divide(cm_display, row_sums, where=(row_sums != 0))
+            show_matrix = cm_norm
+        else:
+            show_matrix = cm_display
+
+        # 生成默认类名
+        if class_names is None:
+            class_names = [str(i) for i in range(num_classes)]
+
+        # 控制注释显示：类别数量过多时仅显示色块
+        annotate = num_classes <= 30
+
+        plt.figure(figsize=figsize)
+        sns.set(font_scale=0.9)
+        ax = plt.gca()
+        im = ax.imshow(show_matrix, interpolation='nearest', cmap=cmap)
+        cbar = ax.figure.colorbar(im, ax=ax)
+
+        # 设置刻度与标签
+        tick_marks = np.arange(num_classes)
+        if num_classes <= 50:
+            ax.set_xticks(tick_marks)
+            ax.set_yticks(tick_marks)
+            ax.set_xticklabels(class_names, rotation=90, fontsize=8)
+            ax.set_yticklabels(class_names, fontsize=8)
+        else:
+            # 类别非常多时隐藏标签以免拥挤
+            ax.set_xticks([])
+            ax.set_yticks([])
+
+        ax.set_ylabel('True')
+        ax.set_xlabel('Predicted')
+        ax.set_title(f'Confusion Matrix - {self._kwargs.get("name","exp")} - Fold {fold}')
+
+        # 添加注释：显示绝对值与/或百分比
+        if annotate:
+            fmt = '.2f' if normalize else 'd'
+            thresh = show_matrix.max() / 2.
+            for i in range(num_classes):
+                for j in range(num_classes):
+                    value = show_matrix[i, j]
+                    if normalize:
+                        text = f"{value:.2%}\n({int(cm[i,j])})"
+                    else:
+                        text = f"{int(cm[i, j])}"
+                    ax.text(j, i, text,
+                            ha="center", va="center",
+                            color="white" if value > thresh else "black", fontsize=7)
+
+        plt.tight_layout()
+        save_path = Path(self.log_dir) / f"{self._kwargs.get('name','exp')}_confusion_fold{fold}.png"
+        plt.savefig(str(save_path), dpi=300)
+        plt.close()
+        self.log(f"Confusion matrix saved to {save_path}")
