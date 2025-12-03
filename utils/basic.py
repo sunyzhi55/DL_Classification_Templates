@@ -7,6 +7,38 @@ import torch
 from torch import optim
 from torch.optim import lr_scheduler
 
+def get_optimizer(optimizer_name, parameters, **kwargs):
+    """
+    获取优化器实例
+
+    Args:
+        parameters: 模型参数
+        lr: 学习率
+        weight_decay: 权重衰减
+        optimizer_name: 优化器名称（如 'Adam', 'SGD', 'RMSprop', 'Adadelta'）
+
+    Returns:
+        optimizer: 对应的优化器实例
+    """
+    lr = kwargs.get('lr', 1e-3)
+    weight_decay = kwargs.get('weight_decay', 0)
+
+    if optimizer_name == 'Adam':
+        optimizer = optim.Adam(parameters, lr=lr, weight_decay=weight_decay)
+    elif optimizer_name == 'SGD':
+        momentum = kwargs.get('momentum', 0.9)
+        optimizer = optim.SGD(parameters, lr=lr, weight_decay=weight_decay, momentum=momentum)
+    elif optimizer_name == 'RMSprop':
+        optimizer = optim.RMSprop(parameters, lr=lr, weight_decay=weight_decay)
+    elif optimizer_name == 'Adadelta':
+        optimizer = optim.Adadelta(parameters, lr=lr, weight_decay=weight_decay)
+    elif optimizer_name == 'AdamW':
+        optimizer = optim.AdamW(parameters, lr=lr, weight_decay=weight_decay)
+    else:
+        raise ValueError(f"Optimizer '{optimizer_name}' is not supported. Please implement it in get_optimizer function.")
+
+    return optimizer
+
 def get_scheduler(optimizer, opt, train_loader=None):
     """
     定义学习率调度器（scheduler）

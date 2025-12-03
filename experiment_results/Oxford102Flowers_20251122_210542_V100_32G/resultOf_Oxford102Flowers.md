@@ -20,7 +20,7 @@ tags:
 
 | 组件 | 规格/版本 | 备注 |
 | :--- | :--- | :--- |
-| **OS** | Rocky Linux 9.6 | |
+| **OS** | Rocky Linux 9.6 (Blue Onyx) (命令：`cat /etc/os-release`) | |
 | **GPU** | NVIDIA RTX V100 (32GB) | CUDA 13.0 |
 | **Framework** | torch  2.6.0+cu118 | |
 | **Python** | 3.9.21 | |
@@ -161,7 +161,7 @@ criterion = nn.CrossEntropyLoss(label_smoothing=0.1).to(device)
 
 
 
-> **总训练时长：16 h 44 min 30 s**
+> **总训练时长：16.0h 44.0m 30.326989889144897s**
 
 ## 5. 评估结果 (Evaluation Results)
 

@@ -4,12 +4,14 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Subset, ConcatDataset, Dataset
 from sklearn.model_selection import KFold
 from configs.config import get_config
-from data.dataset import  get_transforms, OxfordFlowersDataset
-from engine.trainer import Trainer
+from data.dataset import  get_transforms, get_dataset
+from engine.trainer import Trainer, get_trainer
 from pathlib import Path
-from utils.basic import get_scheduler
-from utils.observer import RuntimeObserver
 from models.get_model import get_model
+from utils.basic import get_optimizer, get_scheduler
+from utils.loss_function import get_loss_function
+from utils.observer import RuntimeObserver
+# from models.get_model import get_model # Deprecated, using args.model
 import copy
 # Wrapper to apply transforms dynamically
 
@@ -40,8 +42,13 @@ if __name__ == '__main__':
     train_transform = get_transforms(args.img_size)['train_transforms']
     val_transform = get_transforms(args.img_size)['validation_transforms']
     test_transform = get_transforms(args.img_size)['test_transforms']
-    full_dataset = OxfordFlowersDataset(labels_file=args.train_eval_label_file_path, img_dir=args.data_dir, transform=None)
-    test_dataset = OxfordFlowersDataset(labels_file=args.test_label_file_path, img_dir=args.data_dir, transform=None)
+    
+    # Use dataset class from config
+    full_dataset = get_dataset(args.dataset_name, img_dir=args.data_dir,
+                               labels_file=args.train_eval_label_file_path,
+                               transform=None)
+    print(f"Total images in full dataset: {len(full_dataset)}")
+    
     
     # 2. Training Loop (K-Fold or Single Split)
     start = time.time()
@@ -67,15 +74,25 @@ if __name__ == '__main__':
             val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
             
             # Model
-            model = get_model(args.num_classes, args.checkpoint_path, device)
-            model = model.to(device)
+            model = get_model(args.model_name, args.num_classes, args.checkpoint_path, device)
+            
+                
+            # model = model.to(device)
             total_params = sum(p.numel() for p in model.parameters())
-            print(f"Model resnet34 initialized with {total_params} parameters.")
+            print(f"Model initialized with {total_params} parameters.")
 
             # optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=args.weight_decay, betas=(0.9, 0.98))
-            optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+            # optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+            
+            optimizer = get_optimizer(args.optimizer_name, model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+            
+            
+            # args.scheduler is likely the get_scheduler function itself
             scheduler = get_scheduler(optimizer, args, train_loader)
-            criterion = nn.CrossEntropyLoss(label_smoothing=0.1).to(device)
+            
+            # criterion = nn.CrossEntropyLoss(label_smoothing=0.1).to(device)
+            # criterion = args.criterion(label_smoothing=args.label_smoothing).to(device)
+            criterion = get_loss_function(args.loss_fn_name, device, label_smoothing=args.label_smoothing)
             
             # Observer
             observer = RuntimeObserver(
@@ -88,36 +105,12 @@ if __name__ == '__main__':
                 name=args.exp_name,
                 seed=args.seed
             )
-            
-            trainer = Trainer(model, train_loader, val_loader, optimizer, scheduler, criterion, device, observer, fold=fold+1)
+            trainer = get_trainer(args.trainer_name, model=model, train_loader=train_loader, val_loader=val_loader, optimizer=optimizer, scheduler=scheduler, criterion=criterion, device=device, observer=observer, fold=fold+1)
             trainer.run(args.epochs)
             best_train_eval_dict[fold+1] = copy.deepcopy(observer.best_dicts)
         
         # if test_dataset is not None:
-        #     # 在每折结束后使用最佳模型对测试集做一次完整评估并记录
-        #     test_save_path = Path(best_result_model_path) / f"{args.exp_name}_best_model_fold{fold}.pth"
-        #     test_ids = TransformedSubset(test_dataset, transform=total_transform['test_transforms'])
-        #     test_dataloader = DataLoader(dataset=test_ids, batch_size=batch_size, 
-        #                                  shuffle=False, num_workers=workers)
-        #     model.load_state_dict(torch.load(test_save_path, map_location=device))
-        #     with torch.no_grad():
-        #         model.eval()
-        #         test_iterator = tqdm(test_dataloader, desc=f"Testing Fold {fold}", unit="batch")
-        #         for batch_idx, (images, labels) in enumerate(test_iterator):
-        #             images, labels = images.to(device), labels.to(device)
-        #             outputs_logit = model(images)
-        #             loss = loss_fn(outputs_logit, labels)
-
-        #             prob = torch.softmax(outputs_logit, dim=1)
-        #             _, predictions = torch.max(prob, dim=1)
-        #             test_iterator.set_postfix({
-        #                 "loss": f"{loss.item():.4f}"
-        #             })
-        #             # 更新测试观察器
-        #             observer.test_update(loss, prob, predictions, labels)
-        #     # 计算测试结果
-        #     observer.compute_test_result(len(test_dataloader.dataset))
-        #     test_dict[fold] = observer.test_metric
+        #     # ... (omitted code)
         
         print("\nK-Fold Cross Validation Complete.")
         print("Best Results per Fold:")
@@ -137,13 +130,20 @@ if __name__ == '__main__':
         train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
         val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
         
-        model = get_model(args.num_classes, args.checkpoint_path, device)
+        # model = get_model(args.num_classes, args.checkpoint_path, device)
+        model = get_model(args.model_name, args.num_classes, args.checkpoint_path, device)
+
         # model = model.to(device)
         
         # optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=args.weight_decay, betas=(0.9, 0.98))
-        optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        # optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        optimizer = get_optimizer(args.optimizer_name, model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        
+        # scheduler = get_scheduler(optimizer, args, train_loader)
         scheduler = get_scheduler(optimizer, args, train_loader)
-        criterion = nn.CrossEntropyLoss(label_smoothing=0.1).to(device)
+        
+        # criterion = nn.CrossEntropyLoss(label_smoothing=0.1).to(device)
+        criterion = get_loss_function(args.loss_fn_name, device, label_smoothing=args.label_smoothing)
         
         # Observer
         print(f"args.save_dir: {args.save_dir}")
@@ -157,8 +157,18 @@ if __name__ == '__main__':
             name=args.exp_name,
             seed=args.seed
         )
-        
-        trainer = Trainer(model, train_loader, val_loader, optimizer, scheduler, criterion, device, observer)
+        trainer = get_trainer(
+            args.trainer_name,
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            criterion=criterion,
+            device=device,
+            observer=observer,
+            fold=0
+        )
         trainer.run(args.epochs)
     end = time.time()
     total_seconds = end - start

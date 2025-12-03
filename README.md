@@ -134,35 +134,44 @@ pip install torch torchvision scikit-learn pillow numpy tqdm tensorboard matplot
 
 ### 2️⃣ 启动训练
 
-所有参数均可通过命令行覆盖，默认值定义于 `configs/config.py`。
+项目采用**字典配置驱动**的方式管理实验。所有的实验配置都集中在 `configs/experiments_object.py` 文件中。
 
-#### 🔹 基础训练
-```bash
-python main.py \
-  --data_dir /your/image/root \
-  --train_eval_label_file_path /path/to/train.txt \
-  --num_classes 102 \
-  --exp_name flowers_resnet50
+#### 🔹 步骤 1：定义实验配置
+打开 `configs/experiments_object.py`，在 `experiments` 字典中添加你的实验配置。你可以复制现有的配置并修改参数：
+
+```python
+experiments = {
+    "My_New_Experiment": {
+        # Model
+        "model": resnet50,  # 直接引用模型类
+        "num_classes": 10,
+        
+        # Dataset
+        "dataset": MyCustomDataset, # 直接引用数据集类
+        "data_dir": "/path/to/data",
+        
+        # Training
+        "batch_size": 32,
+        "lr": 1e-3,
+        "epochs": 100,
+        # ... 其他参数
+    }
+}
 ```
 
-#### 🔹 K-Fold 交叉验证（例如 5 折）
+#### 🔹 步骤 2：运行实验
+使用 `--exp_name` 参数指定你要运行的实验名称：
+
 ```bash
-python main.py --k_fold 5 --epochs 100 --batch_size 32
+python main.py --exp_name My_New_Experiment
 ```
 
-#### 🔹 单次训练（80/20 自动划分）
-```bash
-python main.py --k_fold 0 --epochs 50
-```
+程序会自动加载字典中定义的所有参数（模型、数据集、优化器、超参数等），并覆盖默认配置。
 
-#### 🔸 常用参数说明
-| 参数 | 说明 |
-|------|------|
-| `--exp_name` | 实验名称（用于日志和模型保存目录） |
-| `--device` | 设备（如 `cuda:0`, `cpu`） |
-| `--model_name` | 模型名称（需在 `get_model.py` 中注册） |
-| `--lr` | 初始学习率（默认 `1e-3`） |
-| `--output_dir` | 输出根目录（日志、权重、配置备份） |
+#### 🔹 为什么使用字典配置？
+- **集中管理**：所有实验的超参数一目了然，方便对比和复现。
+- **灵活性**：可以直接在配置中引用 Python 对象（如模型类、数据集类、优化器类），而不仅仅是字符串。
+- **版本控制**：配置文件本身就是代码的一部分，方便使用 Git 进行版本控制。
 
 ---
 
@@ -234,9 +243,18 @@ python test.py --data_dir /your/image/root --test_label_file_path /path/to/test.
 ---
 
 ## 💳 `experiment_results` 目录说明
+
 用于保存每次实验的日志、模型权重和配置备份。
 
 以`markdown`格式记录每次实验的关键指标，便于对比和复现。
+
+目录文件说明：
+
+```
+数据集_年月日_时分秒毫秒_显卡配置
+```
+
+
 
 
 ## 🛠️ 扩展指南

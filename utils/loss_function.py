@@ -119,6 +119,18 @@ class FocalLossWithTwoClass(nn.Module):
         else:
             return focal_loss
 
+def get_loss_function(loss_name: str, device: torch.device, **kwargs) -> nn.Module:
+    if loss_name == "CrossEntropyLoss":
+        label_smoothing = kwargs.get("label_smoothing", 0.0)
+        return nn.CrossEntropyLoss(label_smoothing=label_smoothing).to(device)
+    elif loss_name == "FocalLoss":
+        alpha = kwargs.get("alpha", 0.25)
+        gamma = kwargs.get("gamma", 2)
+        reduction = kwargs.get("reduction", "mean")
+        position_weight = kwargs.get("position_weight", None)
+        return FocalLoss(device=device, alpha=alpha, gamma=gamma, reduction=reduction, position_weight=position_weight)
+    else:
+        raise ValueError(f"Loss function '{loss_name}' is not supported.")
 
 # 示例
 if __name__ == '__main__':

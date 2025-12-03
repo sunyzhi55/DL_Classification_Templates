@@ -302,7 +302,7 @@ class RuntimeObserver:
         cm = best.get('confusionMatrix', None)
         if cm is not None:
             try:
-                self._save_confusion_matrix(cm, fold)
+                self._save_confusion_matrix(cm, fold, normalize=True)
             except Exception as e:
                 self.log(f"Failed to save confusion matrix for fold {fold}: {e}")
     def _save_confusion_matrix(self, cm, fold, class_names=None, normalize=False, figsize=(10, 8), cmap='Blues'):
@@ -361,6 +361,8 @@ class RuntimeObserver:
             # 类别非常多时隐藏标签以免拥挤
             ax.set_xticks([])
             ax.set_yticks([])
+        
+        ax.grid(False) # 关闭网格线
 
         ax.set_ylabel('True')
         ax.set_xlabel('Predicted')

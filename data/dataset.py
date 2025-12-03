@@ -1,4 +1,6 @@
 from pathlib import Path
+from torch.utils.data import ConcatDataset
+import torchvision
 from collections import defaultdict
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
@@ -72,7 +74,6 @@ class OxfordFlowersDataset(Dataset):
         self.transform = transform
         self.target_transform = target_transform
         
-
     def __len__(self):
         return len(self.img_labels)
 
@@ -102,6 +103,91 @@ class OxfordFlowersDataset(Dataset):
             images_count[class_label] += 1
 
         return dict(images_count)  # 返回普通字典方便使用
+
+# 请实现将CIFAR10中的 item 以字典返回
+class CIFAR10DictDataset(Dataset):
+    def __init__(self, root, train=True, transform=None, target_transform=None):
+        self.cifar10 = torchvision.datasets.CIFAR10(root=root, train=train, download=True)
+        self.transform = transform
+        self.target_transform = target_transform
+
+    def __len__(self):
+        return len(self.cifar10)
+
+    def __getitem__(self, idx):
+        image, label = self.cifar10[idx]
+        if self.transform:
+            image = self.transform(image)
+        if self.target_transform:
+            label = self.target_transform(label)
+        batch = {
+            "image": image,
+            "label": label,
+            "index": idx
+        }
+        return batch
+    
+def CIFAR10Dataset(img_dir, **kwargs):
+    
+    train_dataset = CIFAR10DictDataset(root=img_dir, train=True, transform=kwargs.get('transform', None))
+    test_dataset = CIFAR10DictDataset(root=img_dir, train=False, transform=kwargs.get('transform', None))
+    return {
+        'train': train_dataset,
+        'test': test_dataset
+    }
+
+
+# 请实现将CIFAR100中的 item 以字典返回
+class CIFAR100DictDataset(Dataset):
+    def __init__(self, root, train=True, transform=None, target_transform=None):
+        self.cifar100 = torchvision.datasets.CIFAR100(root=root, train=train, download=True)
+        self.transform = transform
+        self.target_transform = target_transform
+
+    def __len__(self):
+        return len(self.cifar100)
+
+    def __getitem__(self, idx):
+        image, label = self.cifar100[idx]
+        if self.transform:
+            image = self.transform(image)
+        if self.target_transform:
+            label = self.target_transform(label)
+        batch = {
+            "image": image,
+            "label": label,
+            "index": idx
+        }
+        return batch
+    
+def CIFAR100Dataset(img_dir, **kwargs):
+    train_dataset = CIFAR100DictDataset(root=img_dir, train=True, transform=kwargs.get('transform', None))
+    test_dataset = CIFAR100DictDataset(root=img_dir, train=False, transform=kwargs.get('transform', None))
+    return {
+        'train': train_dataset,
+        'test': test_dataset
+    }
+
+
+def get_dataset(dataset_name, **kwargs):
+    if dataset_name == 'OxfordFlowers':
+        return OxfordFlowersDataset(**kwargs)
+    elif dataset_name == 'ImageFolderDict':
+        return ImageFolderDictDataset(**kwargs)
+    elif dataset_name == 'CIFAR10':
+        dataset = CIFAR10Dataset(**kwargs)
+        train_dataset = dataset['train']
+        test_dataset = dataset['test']
+        full_dataset = ConcatDataset([train_dataset, test_dataset])
+        return full_dataset
+    elif dataset_name == 'CIFAR100':
+        dataset = CIFAR100Dataset(**kwargs)
+        train_dataset = dataset['train']
+        test_dataset = dataset['test']
+        full_dataset = ConcatDataset([train_dataset, test_dataset])
+        return full_dataset
+    else:
+        raise ValueError(f"未知的数据集名称: {dataset_name}")
 
 
 
@@ -160,6 +246,7 @@ def get_transforms(img_size):
     return train_validation_test_transform
 
 
+
 if __name__ == "__main__":
     # 使用示例：
 
@@ -171,15 +258,24 @@ if __name__ == "__main__":
     ])
 
     # 假设你的图片存储在'./images/'目录下，且你想加载训练集
-    dataset = OxfordFlowersDataset(labels_file=r"D:\BaiduNetdiskDownload\Oxford 102 Flowers\data\oxford-102-flowers\all.txt",
-                                 img_dir=r"D:\BaiduNetdiskDownload\Oxford 102 Flowers\data\oxford-102-flowers\jpg",
-                                 transform=transform)
+    # dataset = OxfordFlowersDataset(labels_file=r"D:\BaiduNetdiskDownload\Oxford 102 Flowers\data\oxford-102-flowers\all.txt",
+    #                              img_dir=r"D:\BaiduNetdiskDownload\Oxford 102 Flowers\data\oxford-102-flowers\jpg",
+    #                              transform=transform)
+    
+    dataset = CIFAR10Dataset(img_dir=r"/data3/wangchangmiao/shenxy/PublicDataset/cifar10",
+                             labels_file=None,
+                             transform=transform)
+    train_dataset = dataset['train']
+    test_dataset = dataset['test']
+    print(f"训练集大小: {len(train_dataset)}")
+    print(f"测试集大小: {len(test_dataset)}")
 
     # 创建DataLoader
     data_loader = DataLoader(dataset, batch_size=4, shuffle=True)
-
-    images_per_class = dataset.count_images_per_class()
-    print(images_per_class)
+    # 打印Cifar10数据集类别数量
+    print(f"CIFAR10数据集类别数量: {len(train_dataset.cifar10.classes)}")
+    print(f"CIFAR10数据集类别名称: {train_dataset.cifar10.classes}")
+    
 
     # # 遍历DataLoader
     # for images, labels in data_loader:

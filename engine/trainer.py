@@ -79,9 +79,11 @@ class Trainer:
                 print("Early stopping triggered.")
                 break
             
-            # if self.scheduler is not None: # OneCycleLR在每个step更新学习率
+            # if self.scheduler is not None:
             #         self.scheduler.step()
-            
-        
         self.observer.finish(self.fold)
 
+def get_trainer(trainer_name, **kwargs):
+    
+    return Trainer(**kwargs)
+    
