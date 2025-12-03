@@ -41,6 +41,13 @@ tags:
 
 ---
 
+
+
+> 本版本使用`tensorboard`记录实验结果
+>
+> `swablan`记录实验结果版本：[sunyzhi55/DL_Classification_Templates at swanlab](https://github.com/sunyzhi55/DL_Classification_Templates/tree/swanlab)
+
+
 ## 📌 项目简介
 
 这是一个基于 **PyTorch** 构建的**通用深度学习图像分类框架**，专为快速实验、模型对比与生产部署设计。项目提供：
@@ -77,7 +84,7 @@ project/
 │   ├── basic.py               # 学习率调度、设备设置等基础工具
 │   ├── loss_function.py       # 自定义损失函数
 │   ├── model_stats.py         # 模型参数与 FLOPs 计算工具
-│   ├── observer.py            # 日志记录、指标跟踪、TensorBoard 支持
+│   ├── observer.py            # 日志记录、指标跟踪、SwanLab 支持
 │   └── reproducibility.py     # 可复现性工具（随机种子设置）
 ├── main.py                    # 主训练入口
 ├── README.md                  # 你正在阅读的文档 ❤️
@@ -99,14 +106,14 @@ project/
 - **scikit-learn**（用于 K-Fold 划分）
 - **Pillow**（图像处理）
 - **NumPy**
-- **tqdm, tensorboard**（可选，用于进度条与日志可视化）
+- **tqdm, swanlab**（可选，用于进度条与日志可视化）
  - **matplotlib, seaborn**（用于保存混淆矩阵可视化）
  - **ptflops**（用于计算模型 FLOPs / MACs）
 
 推荐使用 `conda` 或 `venv` 创建独立环境：
 
 ```bash
-pip install torch torchvision scikit-learn pillow numpy tqdm tensorboard matplotlib seaborn ptflops
+pip install torch torchvision scikit-learn pillow numpy tqdm swanlab matplotlib seaborn ptflops
 # 或使用 requirements.txt
 pip install -r requirements.txt
 
