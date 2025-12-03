@@ -61,6 +61,15 @@ if __name__ == '__main__':
     start = time.time()
     if args.k_fold > 1:
         print(f"Starting {args.k_fold}-Fold Cross Validation")
+        
+        # 准备SwanLab配置（将在第一折训练时初始化）
+        swanlab_config = {
+            'project': args.exp_name,
+            'experiment_name': f"{args.exp_name}_seed{args.seed}_kfold{args.k_fold}",
+            'config': vars(args),
+            'logdir': args.save_dir
+        }
+        
         kf = KFold(n_splits=args.k_fold, shuffle=True, random_state=args.seed)
         
         best_train_eval_dict = {}
@@ -126,12 +135,30 @@ if __name__ == '__main__':
                 task="multiclass" if args.num_classes > 2 else "binary",
                 average='macro' if args.num_classes > 2 else 'micro',
                 patience=args.patience,
+                fold=fold+1,  # 传入当前fold编号
                 name=args.exp_name,
                 seed=args.seed,
                 hyperparameters=vars(args)  # 传递所有超参数
             )
-            trainer = get_trainer(args.trainer_name, model=model, train_loader=train_loader, val_loader=val_loader, optimizer=optimizer, scheduler=scheduler, criterion=criterion, device=device, observer=observer, fold=fold+1)
-            trainer.run(args.epochs)
+            # 判断是否是最后一折
+            is_last_fold = (fold == args.k_fold - 1)
+            
+            trainer = get_trainer(
+                args.trainer_name, 
+                model=model, 
+                train_loader=train_loader, 
+                val_loader=val_loader, 
+                optimizer=optimizer, 
+                scheduler=scheduler, 
+                criterion=criterion, 
+                device=device, 
+                observer=observer, 
+                fold=fold+1,
+                swanlab_config=swanlab_config,
+                full_dataset=full_dataset,
+                img_size=args.img_size
+            )
+            trainer.run(args.epochs, is_last_fold=is_last_fold)
             best_train_eval_dict[fold+1] = copy.deepcopy(observer.best_dicts)
         
         # if test_dataset is not None:
@@ -144,6 +171,16 @@ if __name__ == '__main__':
         
     else:
         # Simple split 80/20 with reproducible seed
+        print("Starting Single Training (Non K-Fold)")
+        
+        # 准备SwanLab配置
+        swanlab_config = {
+            'project': args.exp_name,
+            'experiment_name': f"{args.exp_name}_seed{args.seed}",
+            'config': vars(args),
+            'logdir': args.save_dir
+        }
+        
         total_size = len(full_dataset)
         train_size = int(0.8 * total_size)
         val_size = total_size - train_size
@@ -180,6 +217,7 @@ if __name__ == '__main__':
             task="multiclass" if args.num_classes > 2 else "binary",
             average='macro' if args.num_classes > 2 else 'micro',
             patience=args.patience,
+            fold=0,  # 单次训练，fold=0
             name=args.exp_name,
             seed=args.seed,
             hyperparameters=vars(args)  # 传递所有超参数
@@ -194,9 +232,13 @@ if __name__ == '__main__':
             criterion=criterion,
             device=device,
             observer=observer,
-            fold=0
+            fold=0,
+            swanlab_config=swanlab_config,
+            full_dataset=full_dataset,
+            img_size=args.img_size
         )
-        trainer.run(args.epochs)
+        trainer.run(args.epochs, is_last_fold=True)
+        
     end = time.time()
     total_seconds = end - start
     # 计算小时、分钟和秒

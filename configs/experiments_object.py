@@ -15,9 +15,9 @@ experiments = {
         # Dataset Configuration
         # ==============================================================================
         "dataset_name": "OxfordFlowers",
-        "data_dir": "/home/shenxiangyuhd/public_dataset/oxfordFlowers/pic",
-        "train_eval_label_file_path": "/home/shenxiangyuhd/public_dataset/oxfordFlowers/train_valid.txt",
-        "test_label_file_path": "/home/shenxiangyuhd/public_dataset/oxfordFlowers/test.txt",
+        "data_dir": "/data3/wangchangmiao/shenxy/PublicDataset/oxfordFlowers/jpg",
+        "train_eval_label_file_path": "/data3/wangchangmiao/shenxy/PublicDataset/oxfordFlowers/train_valid.txt",
+        "test_label_file_path": "/data3/wangchangmiao/shenxy/PublicDataset/oxfordFlowers/test.txt",
         "img_size": 224,
         "num_workers": 4,  # Number of data loading workers
         

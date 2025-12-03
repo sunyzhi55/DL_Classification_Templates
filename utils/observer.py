@@ -11,7 +11,7 @@ from torchmetrics import (
     Accuracy, Recall, Precision, Specificity, F1Score,
     ConfusionMatrix, AUROC, MetricCollection, CohenKappa
 )
-from torch.utils.tensorboard import SummaryWriter
+import swanlab
 from typing import Literal
 
 
@@ -49,7 +49,7 @@ class RuntimeObserver:
     def __init__(self, log_dir, device, num_classes=2,
                  task: Literal["binary", "multiclass"] = "multiclass",
                  average: Literal["micro", "macro", "weighted", "none"] = "micro",
-                 patience: int = 50, **kwargs):
+                 patience: int = 50, fold: int = 0, **kwargs):
         """
         :param log_dir: Directory to save logs and model weights
         :param device: torch.device
@@ -57,6 +57,7 @@ class RuntimeObserver:
         :param task: 'binary' or 'multiclass'
         :param average: Averaging mode for metrics
         :param patience: Early stopping patience
+        :param fold: Current fold number (0 for non-kfold training)
         :param kwargs: Optional metadata (experiment name, random seed, hyperparameters)
         """
         self.log_dir = str(log_dir)
@@ -68,6 +69,7 @@ class RuntimeObserver:
         }
         self.device = device
         self.task = task
+        self.fold = fold
 
         # 初始化 best 记录
         self.best_dicts = {
@@ -111,8 +113,10 @@ class RuntimeObserver:
         self.compute_eval_auc = AUROC(num_classes=num_classes, task=task).to(device)
         self.compute_test_auc = AUROC(num_classes=num_classes, task=task).to(device)
 
-        # 初始化日志与早停
-        self.summary = SummaryWriter(log_dir=self.log_dir + 'summary')
+        # SwanLab会话由外部管理，这里不初始化
+        # 用于标识当前fold的前缀
+        self.metric_prefix = f"Fold{fold}/" if fold > 0 else ""
+        
         self.early_stopping = EarlyStopping(patience=patience, verbose=True)
         
         # 记录实验基本信息和超参数
@@ -188,7 +192,7 @@ class RuntimeObserver:
 
 
     def compute_result(self, epoch, train_dataset_length, eval_dataset_length):
-        """Compute metrics for the epoch and log to TensorBoard."""
+        """Compute metrics for the epoch and log to SwanLab."""
         self.average_train_loss = self.total_train_loss / train_dataset_length
         self.average_eval_loss = self.total_eval_loss / eval_dataset_length
 
@@ -201,14 +205,20 @@ class RuntimeObserver:
         self.train_balance_accuracy = (self.train_metric['Recall'] + self.train_metric['Specificity']) / 2.0
         self.eval_balance_accuracy = (self.eval_metric['Recall'] + self.eval_metric['Specificity']) / 2.0
 
-        # TensorBoard logging
-        self.summary.add_scalar('Loss/train', self.average_train_loss, epoch)
-        self.summary.add_scalar('Loss/val', self.average_eval_loss, epoch)
-        self.summary.add_scalar('Eval/Accuracy', self.eval_metric['Accuracy'], epoch)
-        self.summary.add_scalar('Eval/F1', self.eval_metric['F1'], epoch)
-        self.summary.add_scalar('Eval/AUC', self.eval_auc, epoch)
-        self.summary.add_scalar('Eval/BalanceAcc', self.eval_balance_accuracy, epoch)
-        self.summary.add_scalar('Eval/CohenKappa', self.eval_metric['CohenKappa'], epoch)
+        # SwanLab logging with fold prefix
+        swanlab.log({
+            f'{self.metric_prefix}Loss/train': self.average_train_loss,
+            f'{self.metric_prefix}Loss/val': self.average_eval_loss,
+            f'{self.metric_prefix}Eval/Accuracy': self.eval_metric['Accuracy'].item(),
+            f'{self.metric_prefix}Eval/F1': self.eval_metric['F1'].item(),
+            f'{self.metric_prefix}Eval/AUC': self.eval_auc.item(),
+            f'{self.metric_prefix}Eval/BalanceAcc': self.eval_balance_accuracy.item(),
+            f'{self.metric_prefix}Eval/CohenKappa': self.eval_metric['CohenKappa'].item(),
+            f'{self.metric_prefix}Train/Accuracy': self.train_metric['Accuracy'].item(),
+            f'{self.metric_prefix}Train/F1': self.train_metric['F1'].item(),
+            f'{self.metric_prefix}Train/AUC': self.train_auc.item(),
+            f'{self.metric_prefix}Train/BalanceAcc': self.train_balance_accuracy.item(),
+        }, step=epoch)
 
     def print_result(self, e, epochs):
         """Print results for the current epoch."""
@@ -301,6 +311,16 @@ class RuntimeObserver:
             f"ConfusionMatrix:\n{best['confusionMatrix']}\n"
         )
         self.log(msg)
+        
+        # 记录最佳结果到swanlab（使用summary记录最终结果）
+        swanlab.log({
+            f'{self.metric_prefix}Best/Accuracy': float(best['Accuracy']),
+            f'{self.metric_prefix}Best/F1': float(best['F1']),
+            f'{self.metric_prefix}Best/AUC': float(best['AuRoc']),
+            f'{self.metric_prefix}Best/BalanceAcc': float(best['BalanceAccuracy']),
+            f'{self.metric_prefix}Best/Epoch': int(best['epoch']),
+        })
+        
         # 保存混淆矩阵为图片（每折）
         cm = best.get('confusionMatrix', None)
         if cm is not None:

@@ -280,9 +280,7 @@ stringzilla==3.12.3
 swanlab==0.7.2
 sympy==1.14.0
 tabulate==0.9.0
-tensorboard==2.19.0
-tensorboard-data-server==0.7.2
-tensorboardX==2.6.2.2
+swanlab==0.7.2
 termcolor==2.5.0
 terminado==0.18.1
 text-unidecode==1.3
