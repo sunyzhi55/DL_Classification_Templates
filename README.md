@@ -43,6 +43,15 @@ tags:
 
 > **注：该版本是swanlab版本。使用了swanlab进行日志记录和可视化支持。**
 
+> 本分支（`swanlab`）说明
+>
+> - ✅ 本分支将实验记录从 TensorBoard 迁移到 SwanLab（见 `engine/trainer.py` 与 `utils/observer.py` 的实现）。
+> - 🧭 行为说明：SwanLab 会话由 `Trainer` 统一初始化（在训练开始时），K-Fold 场景下会在第一折初始化一次并使用折前缀（`Fold1/`, `Fold2/` …）记录各折指标；训练结束时会自动调用 `swanlab.finish()`（最后一折）。
+> - 🖼️ 本分支还会在训练开始时自动上传前 20 张训练样本到 SwanLab（`Sample_Images/Training_Samples`），用于快速检查数据加载与标签是否正确。
+> - 🔗 分支链接（可直接访问）：[sunyzhi55/DL_Classification_Templates at swanlab](https://github.com/sunyzhi55/DL_Classification_Templates/tree/swanlab)
+> 
+> 注意：默认 `main` 分支仍保留原来的 TensorBoard 支持；若你想在本分支使用 SwanLab 功能，请确保已安装 `swanlab` 并在 GitHub 上配置好访问权限（若使用远程记录）。
+
 
 ## 📌 项目简介
 
