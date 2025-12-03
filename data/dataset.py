@@ -170,6 +170,9 @@ def CIFAR100Dataset(img_dir, **kwargs):
 
 
 def get_dataset(dataset_name, **kwargs):
+    """
+    获取指定数据集
+    """
     if dataset_name == 'OxfordFlowers':
         return OxfordFlowersDataset(**kwargs)
     elif dataset_name == 'ImageFolderDict':
@@ -192,6 +195,12 @@ def get_dataset(dataset_name, **kwargs):
 
 
 def get_transforms(img_size):
+    """获取数据增强和预处理变换
+    Args:
+        img_size (int): 输入图像的目标大小
+    Returns:
+        dict: 包含'train_transforms'、'validation_transforms'和'test_transforms'的字典
+    """
     train_validation_test_transform={
         # 'train_transforms':transforms.Compose([
         # transforms.CenterCrop(330),

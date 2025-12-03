@@ -7,6 +7,7 @@ from configs.config import get_config
 from data.dataset import OxfordFlowersDataset, get_transforms
 from models.get_model import get_model
 from utils.observer import RuntimeObserver
+from utils.reproducibility import set_global_seed
 import torch.nn as nn
 from datetime import datetime
 
@@ -40,6 +41,10 @@ def build_dataset(args):
 
 if __name__ == '__main__':
     args = parse_args()
+    
+    # 设置全局随机种子确保可复现性
+    set_global_seed(args.seed, deterministic=True)
+    
     device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
 
     model = get_model(args.num_classes, args.checkpoint, device)

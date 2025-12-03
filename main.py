@@ -11,7 +11,7 @@ from models.get_model import get_model
 from utils.basic import get_optimizer, get_scheduler
 from utils.loss_function import get_loss_function
 from utils.observer import RuntimeObserver
-# from models.get_model import get_model # Deprecated, using args.model
+from utils.reproducibility import set_global_seed, make_reproducible_split
 import copy
 # Wrapper to apply transforms dynamically
 
@@ -19,15 +19,19 @@ class TransformSubset(Dataset):
     def __init__(self, subset, transform=None):
         self.subset = subset
         self.transform = transform
-
     def __getitem__(self, index):
-        sample = self.subset[index]
-        if self.transform:
-            # 对MRI和PET分别应用转换
-            if 'image' in sample:
-                sample['image'] = self.transform(sample['image'])
-                sample['image'] = sample['image']
-        return sample
+        item = self.subset[index]
+        # 统一处理：支持dict和tuple两种格式
+        if isinstance(item, dict):
+            image, label = item['image'], item['label']
+            if self.transform:
+                image = self.transform(image)
+            return {'image': image, 'label': label, **{k:v for k,v in item.items() if k not in ['image','label']}}
+        else:
+            image, label = item
+            if self.transform:
+                image = self.transform(image)
+            return {'image': image, 'label': label}
 
     def __len__(self):
         return len(self.subset)
@@ -35,6 +39,9 @@ class TransformSubset(Dataset):
 
 if __name__ == '__main__':
     args = get_config()
+    
+    # ========== 设置全局随机种子确保可复现性 ==========
+    set_global_seed(args.seed)
     
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
     
@@ -70,8 +77,25 @@ if __name__ == '__main__':
             train_data = TransformSubset(train_subset, transform=train_transform)
             val_data = TransformSubset(val_subset, transform=val_transform)
             
-            train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
-            val_loader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
+            # main.py
+            train_loader = DataLoader(
+                train_data, 
+                batch_size=args.batch_size, 
+                shuffle=True, 
+                num_workers=args.num_workers,
+                pin_memory=True,           # ✅ 加速GPU传输
+                prefetch_factor=2,         # ✅ 预取数据
+                persistent_workers=True    # ✅ 保持worker进程
+            )
+            val_loader = DataLoader(
+                val_data,
+                batch_size=args.batch_size,
+                shuffle=False,
+                num_workers=args.num_workers,
+                pin_memory=True,
+                prefetch_factor=2,
+                persistent_workers=True
+            )
             
             # Model
             model = get_model(args.model_name, args.num_classes, args.checkpoint_path, device)
@@ -103,7 +127,8 @@ if __name__ == '__main__':
                 average='macro' if args.num_classes > 2 else 'micro',
                 patience=args.patience,
                 name=args.exp_name,
-                seed=args.seed
+                seed=args.seed,
+                hyperparameters=vars(args)  # 传递所有超参数
             )
             trainer = get_trainer(args.trainer_name, model=model, train_loader=train_loader, val_loader=val_loader, optimizer=optimizer, scheduler=scheduler, criterion=criterion, device=device, observer=observer, fold=fold+1)
             trainer.run(args.epochs)
@@ -118,11 +143,12 @@ if __name__ == '__main__':
             print(f"Fold {fold}: {results}")
         
     else:
-        # Simple split 80/20
+        # Simple split 80/20 with reproducible seed
         total_size = len(full_dataset)
         train_size = int(0.8 * total_size)
         val_size = total_size - train_size
-        train_subset, val_subset = torch.utils.data.random_split(full_dataset, [train_size, val_size])
+        # 使用可复现的数据集划分
+        train_subset, val_subset = make_reproducible_split(full_dataset, [train_size, val_size], seed=args.seed)
         
         train_data = TransformSubset(train_subset, transform=train_transform)
         val_data = TransformSubset(val_subset, transform=val_transform)
@@ -155,7 +181,8 @@ if __name__ == '__main__':
             average='macro' if args.num_classes > 2 else 'micro',
             patience=args.patience,
             name=args.exp_name,
-            seed=args.seed
+            seed=args.seed,
+            hyperparameters=vars(args)  # 传递所有超参数
         )
         trainer = get_trainer(
             args.trainer_name,

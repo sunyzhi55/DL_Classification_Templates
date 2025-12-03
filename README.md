@@ -49,7 +49,8 @@ tags:
 - ✅ K-Fold 交叉验证支持  
 - ✅ 灵活的数据加载（List 文件 / 文件夹格式）  
 - ✅ 完善的日志记录、指标监控与训练可视化  
-- ✅ 开箱即用的训练、测试与推理脚本  
+- ✅ 开箱即用的训练、测试与推理脚本
+- ✅ **完整的可复现性保证**（全局随机种子设置）  
 
 无论你是学术研究者、算法工程师，还是刚入门深度学习的新手，该项目都能为你提供清晰、模块化且易于维护的代码基础。
 
@@ -60,30 +61,30 @@ tags:
 ```text
 project/
 ├── configs/           
-│   └── config.py          # 全局配置解析与默认参数定义
+│   ├── config.py              # 全局配置解析与默认参数定义
+│   └── experiments_object.py  # 实验配置字典
 ├── data/              
-│   ├── dataset.py         # 数据集加载器（支持 List 和 Folder 格式 + 增强策略）
-│   └── ...                # （可扩展：CSV、HDF5 等）
+│   └── dataset.py             # 数据集加载器（支持 List 和 Folder 格式 + 增强策略）
 ├── models/            
-│   ├── get_model.py       # 模型工厂函数（统一入口）
+│   ├── get_model.py           # 模型工厂函数（统一入口）
 │   ├── ResNet.py
 │   ├── EfficientNet.py
-│   ├── EfficientViT.py
-│   ├── MetaFormer.py
-│   ├── PoolFormer.py
-│   └── ...                # 支持无缝添加新架构
+│   └── ...                    # 支持无缝添加新架构
 ├── engine/            
-│   └── trainer.py         # 训练/验证核心逻辑（含早停、调度器等）
-├── experiment_results/    # 记录每次实验的日志
+│   └── trainer.py             # 训练/验证核心逻辑（含早停、调度器等）
+├── experiment_results/        # 记录每次实验的日志
 ├── utils/
-│   ├── basic.py           # 学习率调度、设备设置等基础工具
-│   └── loss_function.py   # 自定义损失函数（如 LabelSmoothing）
-│   ├── model_stats.py     # 模型参数与 FLOPs 计算工具
-│   ├── observer.py        # 日志记录、指标跟踪、TensorBoard 支持
-├── main.py                # 主训练入口
-├── infer.py               # 单图/批量推理脚本
-├── test.py                # 模型评估脚本（准确率、混淆矩阵等）
-└── README.md              # 你正在阅读的文档 ❤️
+│   ├── basic.py               # 学习率调度、设备设置等基础工具
+│   ├── loss_function.py       # 自定义损失函数
+│   ├── model_stats.py         # 模型参数与 FLOPs 计算工具
+│   ├── observer.py            # 日志记录、指标跟踪、TensorBoard 支持
+│   └── reproducibility.py     # 可复现性工具（随机种子设置）
+├── main.py                    # 主训练入口
+├── README.md                  # 你正在阅读的文档 ❤️
+├── infer.py                   # 单图/批量推理脚本
+├── test.py                    # 模型评估脚本
+└── requirements.txt           # 依赖管理
+
 ```
 
 ---
@@ -106,8 +107,10 @@ project/
 
 ```bash
 pip install torch torchvision scikit-learn pillow numpy tqdm tensorboard matplotlib seaborn ptflops
-```
+# 或使用 requirements.txt
+pip install -r requirements.txt
 
+```
 ---
 
 ## 🚀 快速开始
@@ -168,6 +171,21 @@ python main.py --exp_name My_New_Experiment
 
 程序会自动加载字典中定义的所有参数（模型、数据集、优化器、超参数等），并覆盖默认配置。
 
+**✨ 可复现性保证：**
+- 程序会自动使用配置中的 `seed` 参数设置全局随机种子
+- 输出会显示：`✅ Global random seed set to: XXX`
+- 相同配置的多次运行将产生完全相同的结果
+
+```python
+# 配置示例（包含 seed）
+"My_Experiment": {
+    "seed": 42,  # 随机种子，确保可复现性
+    "model_name": "resnet34",
+    "batch_size": 64,
+    # ... 其他参数
+}
+```
+
 #### 🔹 为什么使用字典配置？
 - **集中管理**：所有实验的超参数一目了然，方便对比和复现。
 - **灵活性**：可以直接在配置中引用 Python 对象（如模型类、数据集类、优化器类），而不仅仅是字符串。
@@ -191,6 +209,36 @@ python infer.py \
 ```
 ./img1.jpg → class 17 (probability: 0.92)
 ./img2.jpg → class 42 (probability: 0.88)
+```
+
+---
+
+## 🔄 可复现性与实验管理
+
+### 🎯 完整的可复现性保证
+
+项目已实现工业级的可复现性设置，确保实验结果可以被准确复现：
+
+```python
+# 所有随机源都被控制
+✅ Python random
+✅ NumPy random  
+✅ PyTorch CPU random
+✅ PyTorch GPU random (CUDA)
+✅ DataLoader shuffle
+✅ 数据集划分（train/val split）
+```
+
+**自动化特性：**
+- 训练脚本自动读取配置中的 `seed` 并设置全局种子
+- 数据集划分使用可复现的 Generator
+- 所有随机操作都使用相同的种子
+
+**验证方法：**
+```bash
+# 两次训练应产生相同结果
+python main.py --exp_name CIFAR10_with_resNet34  # 第一次
+python main.py --exp_name CIFAR10_with_resNet34  # 第二次（结果完全相同）
 ```
 
 ---

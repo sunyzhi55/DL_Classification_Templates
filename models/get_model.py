@@ -6,6 +6,15 @@ from models.__init__ import *
 
 
 def get_model(model_name, num_class, pretrained_path, device):
+    """获取指定模型架构并加载预训练权重（如有提供）
+    Args:
+        model_name (str): 模型名称，如 'resnet34'
+        num_class (int): 分类类别数
+        pretrained_path (str): 预训练权重路径
+        device (str): 设备类型 ('cpu' 或 'cuda')
+    Returns:
+        torch.nn.Module: 构建好的模型
+    """
 
     # model = poolformer_s12(num_classes=1000)
     # model.load_state_dict(torch.load(pretrained_path, weights_only=True))

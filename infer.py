@@ -4,6 +4,7 @@ import torch
 from PIL import Image
 from torchvision import transforms
 from models.get_model import get_model
+from utils.reproducibility import set_global_seed
 
 
 def parse_args():
@@ -14,6 +15,7 @@ def parse_args():
     parser.add_argument('--topk', type=int, default=5)
     parser.add_argument('--device', type=str, default='cpu')
     parser.add_argument('--num_classes', type=int, default=1000)
+    parser.add_argument('--seed', type=int, default=42, help='Random seed for reproducibility')
     return parser.parse_args()
 
 
@@ -27,6 +29,10 @@ def build_transform(img_size):
 
 if __name__ == '__main__':
     args = parse_args()
+    
+    # 设置随机种子（推理时通常不需要，但为了完整性）
+    set_global_seed(args.seed, deterministic=False)
+    
     device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
 
     model = get_model(args.num_classes, args.checkpoint, device)

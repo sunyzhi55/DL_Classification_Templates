@@ -36,8 +36,12 @@ class Trainer:
             # 梯度裁剪
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
             self.optimizer.step()
-            if self.scheduler is not None: # OneCycleLR在每个step更新学习率
-                    self.scheduler.step()
+
+            # 训练循环中
+            if self.scheduler is not None:
+                if isinstance(self.scheduler, torch.optim.lr_scheduler.OneCycleLR):
+                    self.scheduler.step()  # OneCycleLR在每个batch更新学习率
+            
             
             prob = torch.softmax(outputs, dim=1)
             _, predictions = torch.max(prob, dim=1)
@@ -79,8 +83,10 @@ class Trainer:
                 print("Early stopping triggered.")
                 break
             
-            # if self.scheduler is not None:
-            #         self.scheduler.step()
+            # epoch结束后
+            if self.scheduler is not None:
+                if not isinstance(self.scheduler, torch.optim.lr_scheduler.OneCycleLR):
+                    self.scheduler.step()  # epoch级别更新
         self.observer.finish(self.fold)
 
 def get_trainer(trainer_name, **kwargs):

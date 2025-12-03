@@ -57,13 +57,14 @@ class RuntimeObserver:
         :param task: 'binary' or 'multiclass'
         :param average: Averaging mode for metrics
         :param patience: Early stopping patience
-        :param kwargs: Optional metadata (experiment name, random seed)
+        :param kwargs: Optional metadata (experiment name, random seed, hyperparameters)
         """
         self.log_dir = str(log_dir)
         self.log_file = self.log_dir + 'log.txt'
         self._kwargs = {
             'name': kwargs.get('name', 'None'),
-            'seed': kwargs.get('seed', 'None')
+            'seed': kwargs.get('seed', 'None'),
+            'hyperparameters': kwargs.get('hyperparameters', {})
         }
         self.device = device
         self.task = task
@@ -113,8 +114,10 @@ class RuntimeObserver:
         # 初始化日志与早停
         self.summary = SummaryWriter(log_dir=self.log_dir + 'summary')
         self.early_stopping = EarlyStopping(patience=patience, verbose=True)
+        
+        # 记录实验基本信息和超参数
         self.log(f"Experiment: {self._kwargs['name']} | Seed: {self._kwargs['seed']}")
-
+        self.log(f"Hyperparameters: {self._kwargs['hyperparameters']}")
         # 初始化统计
         self.reset()
 
@@ -231,7 +234,7 @@ class RuntimeObserver:
     def get_best(self, epoch):
         """Record best metrics."""
         self.best_dicts['epoch'] = epoch
-        self.best_dicts['confusionMatrix'] = self.eval_metric['confusionMatrix']
+        self.best_dicts['confusionMatrix'] = self.eval_metric['confusionMatrix'].cpu().numpy()
         self.best_dicts['Accuracy'] = self.eval_metric['Accuracy']
         self.best_dicts['Recall'] = self.eval_metric['Recall']
         self.best_dicts['Precision'] = self.eval_metric['Precision']
