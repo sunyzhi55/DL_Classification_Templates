@@ -207,7 +207,7 @@ python main.py --exp_name My_New_Experiment
 
 ### 3️⃣ 模型推理
 
-对单张或多张图像进行预测：
+1、对单张或多张图像进行预测：
 
 ```bash
 python infer.py \
@@ -222,6 +222,23 @@ python infer.py \
 ./img1.jpg → class 17 (probability: 0.92)
 ./img2.jpg → class 42 (probability: 0.88)
 ```
+
+2、对文件夹中的所有图像进行批量推理：
+
+```bash
+python infer.py \
+  --image_dir /path/to/images/ \
+  --checkpoint best_model.pth \
+  --num_classes 102 \
+  --device cuda:0
+```
+
+输出示例：
+```
+/path/to/images/img1.jpg → class 17 (probability: 0.92)
+/path/to/images/img2.jpg → class 42 (probability: 0.88)
+```
+
 
 ---
 

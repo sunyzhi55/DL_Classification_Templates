@@ -15,12 +15,13 @@ from datetime import datetime
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_dir', type=str, 
-                        default="/data3/wangchangmiao/shenxy/PublicDataset/temp/jpg",
+                        default="/data3/wangchangmiao/shenxy/PublicDataset/oxfordFlowers/jpg",
                         help='Path to dataset')
     parser.add_argument('--test_label_file_path', type=str, 
-                        default="/data3/wangchangmiao/shenxy/PublicDataset/temp/test.txt",
+                        default="/data3/wangchangmiao/shenxy/PublicDataset/oxfordFlowers/test.txt",
                         help='Path to csv file')
-    parser.add_argument('--checkpoint', type=str, default="/data3/wangchangmiao/shenxy/Code/flower_classify_3/outputs_20251120_144650/baseline_best_model_fold2.pth")
+    parser.add_argument('--checkpoint', type=str, default="/data3/wangchangmiao/shenxy/Code/DL_Classification_Templates/outputs_20251122_210542_oxfordFlowers/baseline_best_model_fold4.pth")
+    parser.add_argument('--model_name', type=str, default='resnet34')
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--num_workers', type=int, default=4)
     parser.add_argument('--img_size', type=int, default=224)
@@ -47,7 +48,7 @@ if __name__ == '__main__':
     
     device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
 
-    model = get_model(args.num_classes, args.checkpoint, device)
+    model = get_model(args.model_name, args.num_classes, args.checkpoint, device)
     model.load_state_dict(torch.load(args.checkpoint, map_location=device))
     
     # model = model.to(device)
