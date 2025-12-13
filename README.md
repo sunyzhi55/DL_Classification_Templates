@@ -41,13 +41,6 @@ tags:
 
 ---
 
-
-
-> 本版本使用`tensorboard`记录实验结果
->
-> `swablan`记录实验结果版本：[sunyzhi55/DL_Classification_Templates at swanlab](https://github.com/sunyzhi55/DL_Classification_Templates/tree/swanlab)
-
-
 ## 📌 项目简介
 
 这是一个基于 **PyTorch** 构建的**通用深度学习图像分类框架**，专为快速实验、模型对比与生产部署设计。项目提供：
@@ -55,7 +48,7 @@ tags:
 - ✅ 多种主流视觉模型（ResNet, EfficientNet, EfficientViT, MetaFormer 等）  
 - ✅ K-Fold 交叉验证支持  
 - ✅ 灵活的数据加载（List 文件 / 文件夹格式）  
-- ✅ 完善的日志记录、指标监控与训练可视化  
+- ✅ 完善的日志记录、指标监控与训练可视化（TensorBoard + SwanLab）  
 - ✅ 开箱即用的训练、测试与推理脚本
 - ✅ **完整的可复现性保证**（全局随机种子设置）  
 
@@ -84,7 +77,8 @@ project/
 │   ├── basic.py               # 学习率调度、设备设置等基础工具
 │   ├── loss_function.py       # 自定义损失函数
 │   ├── model_stats.py         # 模型参数与 FLOPs 计算工具
-│   ├── observer.py            # 日志记录、指标跟踪、SwanLab 支持
+│   ├── observer.py            # 日志记录、指标跟踪、实验可视化
+│   ├── swanlab_logger.py      # SwanLab 实验跟踪模块（可选）
 │   └── reproducibility.py     # 可复现性工具（随机种子设置）
 ├── main.py                    # 主训练入口
 ├── README.md                  # 你正在阅读的文档 ❤️
@@ -106,15 +100,22 @@ project/
 - **scikit-learn**（用于 K-Fold 划分）
 - **Pillow**（图像处理）
 - **NumPy**
-- **tqdm, swanlab**（可选，用于进度条与日志可视化）
- - **matplotlib, seaborn**（用于保存混淆矩阵可视化）
- - **ptflops**（用于计算模型 FLOPs / MACs）
+- **tqdm**（用于进度条显示）
+- **tensorboard**（实验可视化）
+- **matplotlib, seaborn**（用于保存混淆矩阵可视化）
+- **ptflops**（用于计算模型 FLOPs / MACs）
+- **swanlab**（可选，用于云端实验跟踪）
 
 推荐使用 `conda` 或 `venv` 创建独立环境：
 
 ```bash
-pip install torch torchvision scikit-learn pillow numpy tqdm swanlab matplotlib seaborn ptflops
-# 或使用 requirements.txt
+# 安装核心依赖
+pip install torch torchvision scikit-learn pillow numpy tqdm tensorboard matplotlib seaborn ptflops
+
+# （可选）安装 SwanLab 用于实验跟踪
+pip install swanlab
+
+# 或使用 requirements.txt 一键安装所有依赖
 pip install -r requirements.txt
 
 ```
@@ -262,6 +263,136 @@ python infer.py \
 python main.py --exp_name CIFAR10_with_resNet34  # 第一次
 python main.py --exp_name CIFAR10_with_resNet34  # 第二次（结果完全相同）
 ```
+
+---
+
+## 📊 实验跟踪与可视化
+
+### 1. TensorBoard（默认启用）
+
+项目默认使用 TensorBoard 记录训练指标。日志保存在 `<output_dir>/summary/` 目录下。
+
+**启动 TensorBoard：**
+```bash
+tensorboard --logdir=<output_dir>/summary
+```
+
+**记录的指标：**
+- 训练/验证损失
+- 准确率、F1、AUC、平衡准确率
+- Cohen's Kappa、精确率、召回率、特异度
+
+---
+
+### 2. SwanLab（可选云端实验跟踪）
+
+[SwanLab](https://swanlab.cn) 是一个强大的实验跟踪平台，支持：
+- 📊 实时指标可视化
+- 🖼️ 样本图像自动记录
+- 🔄 K-Fold 多折实验聚合
+- 🌐 云端访问和团队协作
+
+#### ✨ 启用 SwanLab
+
+**步骤 1：安装依赖**
+```bash
+pip install swanlab
+```
+
+**步骤 2：修改实验配置**
+
+在 `configs/experiments_object.py` 中修改对应实验的配置：
+
+```python
+experiments = {
+    "CIFAR10_with_resNet34": {
+        # ... 其他配置 ...
+        
+        # ==============================================================================
+        # SwanLab Configuration (Optional Experiment Tracking)
+        # ==============================================================================
+        "use_swanlab": True,  # ✅ 启用 SwanLab
+        "swanlab_project": "dl-classification",  # SwanLab 项目名称
+        "swanlab_description": "CIFAR10 Classification with ResNet34",  # 实验描述
+        "swanlab_num_samples": 8,  # 记录的样本图像数量
+    }
+}
+```
+
+**步骤 3：运行实验**
+```bash
+python main.py --exp_name CIFAR10_with_resNet34
+```
+
+#### 🎨 SwanLab 配置参数说明
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `use_swanlab` | `bool` | `False` | 是否启用 SwanLab 实验跟踪 |
+| `swanlab_project` | `str` | `"dl-classification"` | SwanLab 项目名称 |
+| `swanlab_description` | `str` | `"Deep Learning Classification Experiment"` | 实验描述 |
+| `swanlab_num_samples` | `int` | `8` | 自动记录的样本图像数量 |
+
+#### 🔍 SwanLab 记录内容
+
+**1. 训练指标（每个 epoch）**
+- `train/loss`, `train/accuracy`, `train/f1`, `train/auc`, `train/balance_acc`
+- `val/loss`, `val/accuracy`, `val/precision`, `val/recall`, `val/specificity`
+- `val/f1`, `val/auc`, `val/balance_acc`, `val/cohen_kappa`
+
+**2. K-Fold 支持**
+- 所有 fold 的指标记录到**同一个 SwanLab run**
+- 每个 fold 的指标带有 `fold_X/` 前缀（如 `fold_1/val/accuracy`）
+- 便于对比不同 fold 的性能差异
+
+**3. 样本图像**
+- 自动从训练集提取前 N 张图像（由 `swanlab_num_samples` 指定）
+- 图像会反归一化到 0-255 范围并显示标签
+- **K-Fold 场景**：仅在第一个 fold 记录一次，避免重复
+
+**4. 混淆矩阵**
+- 每个 fold 的最佳模型混淆矩阵
+- 归一化可视化，显示真实值 vs 预测值分布
+
+#### 🚀 查看实验结果
+
+运行训练后，终端会输出 SwanLab 实验链接：
+
+```
+✅ SwanLab initialized successfully. Project: dl-classification
+   View experiment at: https://swanlab.cn/@username/dl-classification/runs/xxx
+```
+
+点击链接即可在浏览器中查看：
+- 📈 指标曲线对比（支持多 fold 叠加显示）
+- 🖼️ 样本图像展示
+- 📊 混淆矩阵可视化
+- ⚙️ 完整的超参数记录
+
+#### 🔧 与 TensorBoard 共存
+
+- SwanLab 和 TensorBoard **完全独立**，可同时启用
+- SwanLab 默认**关闭**（`use_swanlab: False`），不影响现有功能
+- 未安装 `swanlab` 时会优雅降级，仅打印警告而不中断训练
+
+#### 💡 最佳实践
+
+**单次实验：**
+```python
+"use_swanlab": True,
+"swanlab_num_samples": 8,  # 记录 8 张样本图像
+```
+
+**K-Fold 实验：**
+```python
+"k_fold": 5,  # 5折交叉验证
+"use_swanlab": True,  # 所有 fold 记录到同一个 run
+"swanlab_num_samples": 16,  # 只在 fold 0 记录一次
+```
+
+**多实验对比：**
+- 在 SwanLab 平台上同时运行多个配置
+- 使用项目面板对比不同模型/超参数的效果
 
 ---
 

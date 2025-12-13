@@ -59,6 +59,10 @@ if __name__ == '__main__':
     
     # 2. Training Loop (K-Fold or Single Split)
     start = time.time()
+    
+    # 为 SwanLab 创建一个共享的 logger（K折场景下所有fold共享）
+    # swanlab_logger = None
+    
     if args.k_fold > 1:
         print(f"Starting {args.k_fold}-Fold Cross Validation")
         kf = KFold(n_splits=args.k_fold, shuffle=True, random_state=args.seed)
@@ -126,10 +130,13 @@ if __name__ == '__main__':
                 task="multiclass" if args.num_classes > 2 else "binary",
                 average='macro' if args.num_classes > 2 else 'micro',
                 patience=args.patience,
-                name=args.exp_name,
-                seed=args.seed,
                 hyperparameters=vars(args)  # 传递所有超参数
             )
+            
+            # SwanLab: 记录样本图像（仅在第一个fold）
+            if fold == 0 and observer.swanlab_logger.enabled:
+                observer.swanlab_logger.log_sample_images(full_dataset, fold=fold)
+            
             trainer = get_trainer(args.trainer_name, model=model, train_loader=train_loader, val_loader=val_loader, optimizer=optimizer, scheduler=scheduler, criterion=criterion, device=device, observer=observer, fold=fold+1)
             trainer.run(args.epochs)
             best_train_eval_dict[fold+1] = copy.deepcopy(observer.best_dicts)
@@ -141,6 +148,10 @@ if __name__ == '__main__':
         print("Best Results per Fold:")
         for fold, results in best_train_eval_dict.items():
             print(f"Fold {fold}: {results}")
+        
+        # SwanLab: 完成实验记录（K折完成后）
+        if observer and observer.swanlab_logger.enabled:
+            observer.swanlab_logger.finish()
         
     else:
         # Simple split 80/20 with reproducible seed
@@ -184,6 +195,11 @@ if __name__ == '__main__':
             seed=args.seed,
             hyperparameters=vars(args)  # 传递所有超参数
         )
+        
+        # SwanLab: 记录样本图像
+        if observer.swanlab_logger.enabled:
+            observer.swanlab_logger.log_sample_images(full_dataset, fold=0)
+        
         trainer = get_trainer(
             args.trainer_name,
             model=model,
@@ -197,6 +213,11 @@ if __name__ == '__main__':
             fold=0
         )
         trainer.run(args.epochs)
+        
+        # SwanLab: 完成实验记录
+        if observer.swanlab_logger.enabled:
+            observer.swanlab_logger.finish()
+    
     end = time.time()
     total_seconds = end - start
     # 计算小时、分钟和秒

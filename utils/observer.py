@@ -13,6 +13,7 @@ from torchmetrics import (
 )
 from torch.utils.tensorboard import SummaryWriter
 from typing import Literal
+from utils.swanlab_logger import create_swanlab_logger
 
 
 class EarlyStopping:
@@ -61,11 +62,7 @@ class RuntimeObserver:
         """
         self.log_dir = str(log_dir)
         self.log_file = self.log_dir + 'log.txt'
-        self._kwargs = {
-            'name': kwargs.get('name', 'None'),
-            'seed': kwargs.get('seed', 'None'),
-            'hyperparameters': kwargs.get('hyperparameters', {})
-        }
+        self.hyperparameters = kwargs.get('hyperparameters', {})
         self.device = device
         self.task = task
 
@@ -115,9 +112,12 @@ class RuntimeObserver:
         self.summary = SummaryWriter(log_dir=self.log_dir + 'summary')
         self.early_stopping = EarlyStopping(patience=patience, verbose=True)
         
+        # 初始化 SwanLab 日志器 (可选)
+        self.swanlab_logger = create_swanlab_logger(config=self.hyperparameters, log_dir=self.log_dir)
+        
         # 记录实验基本信息和超参数
-        self.log(f"Experiment: {self._kwargs['name']} | Seed: {self._kwargs['seed']}")
-        self.log(f"Hyperparameters: {self._kwargs['hyperparameters']}")
+        self.log(f"Experiment: {self.hyperparameters.get('exp_name', 'None')} | Seed: {self.hyperparameters.get('seed', 455)}")
+        self.log(f"Hyperparameters: {self.hyperparameters}")
         # 初始化统计
         self.reset()
 
@@ -187,8 +187,8 @@ class RuntimeObserver:
         self.compute_test_auc.update(prob_positive, label)
 
 
-    def compute_result(self, epoch, train_dataset_length, eval_dataset_length):
-        """Compute metrics for the epoch and log to TensorBoard."""
+    def compute_result(self, epoch, train_dataset_length, eval_dataset_length, fold=None):
+        """Compute metrics for the epoch and log to TensorBoard and SwanLab."""
         self.average_train_loss = self.total_train_loss / train_dataset_length
         self.average_eval_loss = self.total_eval_loss / eval_dataset_length
 
@@ -209,6 +209,26 @@ class RuntimeObserver:
         self.summary.add_scalar('Eval/AUC', self.eval_auc, epoch)
         self.summary.add_scalar('Eval/BalanceAcc', self.eval_balance_accuracy, epoch)
         self.summary.add_scalar('Eval/CohenKappa', self.eval_metric['CohenKappa'], epoch)
+        
+        # SwanLab logging (可选)
+        if self.swanlab_logger.enabled:
+            swanlab_metrics = {
+                'Train/Loss': self.average_train_loss,
+                'Train/Accuracy': float(self.train_metric['Accuracy']),
+                'Train/F1': float(self.train_metric['F1']),
+                'Train/AUC': float(self.train_auc),
+                'Train/BalanceAcc': float(self.train_balance_accuracy),
+                'EVal/Loss': self.average_eval_loss,
+                'EVal/Accuracy': float(self.eval_metric['Accuracy']),
+                'EVal/Precision': float(self.eval_metric['Precision']),
+                'EVal/Recall': float(self.eval_metric['Recall']),
+                'EVal/Specificity': float(self.eval_metric['Specificity']),
+                'EVal/F1': float(self.eval_metric['F1']),
+                'EVal/AUC': float(self.eval_auc),
+                'EVal/BalanceAcc': float(self.eval_balance_accuracy),
+                'EVal/CohenKappa': float(self.eval_metric['CohenKappa']),
+            }
+            self.swanlab_logger.log_metrics(swanlab_metrics, step=epoch, fold=fold)
 
     def print_result(self, e, epochs):
         """Print results for the current epoch."""
@@ -246,14 +266,14 @@ class RuntimeObserver:
 
     def execute(self, e, epochs, train_len, eval_len, fold, model=None):
         """Compute metrics, print, check early stopping, and save best model."""
-        self.compute_result(e, train_len, eval_len)
+        self.compute_result(e, train_len, eval_len, fold=fold)
         self.print_result(e, epochs)
 
         # 更新最佳模型
         if self.eval_balance_accuracy > self.best_dicts['BalanceAccuracy']:
             self.get_best(e)
             if model is not None:
-                model_save_path = self.log_dir + f'{self._kwargs["name"]}_best_model_fold{fold}.pth'
+                model_save_path = self.log_dir + f'{self.hyperparameters["exp_name"]}_best_model_fold{fold}.pth'
                 torch.save(model.state_dict(), model_save_path)
                 self.log(f"✅ Best model saved to {model_save_path}\n")
 
@@ -369,7 +389,7 @@ class RuntimeObserver:
 
         ax.set_ylabel('True')
         ax.set_xlabel('Predicted')
-        ax.set_title(f'Confusion Matrix - {self._kwargs.get("name","exp")} - Fold {fold}')
+        ax.set_title(f'Confusion Matrix - {self.hyperparameters.get("exp_name","exp")} - Fold {fold}')
 
         # 添加注释：显示绝对值与/或百分比
         if annotate:
@@ -387,7 +407,7 @@ class RuntimeObserver:
                             color="white" if value > thresh else "black", fontsize=7)
 
         plt.tight_layout()
-        save_path = Path(self.log_dir) / f"{self._kwargs.get('name','exp')}_confusion_fold{fold}.png"
+        save_path = Path(self.log_dir) / f"{self.hyperparameters.get('exp_name','exp')}_confusion_fold{fold}.png"
         plt.savefig(str(save_path), dpi=300)
         plt.close()
         self.log(f"Confusion matrix saved to {save_path}")
