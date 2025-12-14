@@ -40,17 +40,16 @@ def compute_params_flops(model, input_res=(3, 224, 224), device='cpu'):
     }
 
 
-def _load_model_via_get_model(num_classes, checkpoint_path, device_str):
+def _load_model_via_get_model(model_name, num_classes, checkpoint_path, device_str):
     """Import project get_model and build model instance used by this repo."""
-    # Import here to avoid top-level import issues
-    from models.get_model import get_model
     device = torch.device(device_str if torch.cuda.is_available() else 'cpu')
-    model = get_model(num_classes, checkpoint_path, device)
+    model = get_model(model_name, num_classes, checkpoint_path, device)
     return model
 
 
 def main():
     parser = argparse.ArgumentParser(description="Compute model Params and FLOPs for models in this repo")
+    parser.add_argument('--model_name', type=str, default='resnet34')
     parser.add_argument('--num_classes', type=int, default=102)
     parser.add_argument('--img_size', type=int, default=224)
     parser.add_argument('--checkpoint', type=str, default=None)
@@ -59,7 +58,7 @@ def main():
 
     args = parser.parse_args()
 
-    model = _load_model_via_get_model(args.num_classes, args.checkpoint, args.device)
+    model = _load_model_via_get_model(args.model_name, args.num_classes, args.checkpoint, args.device)
 
     stats = compute_params_flops(model, input_res=(3, args.img_size, args.img_size), device=args.device)
 

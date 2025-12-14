@@ -66,9 +66,10 @@ class Config:
 
         # Create output directory with timestamp (use pathlib.Path)
         timestamp = str(datetime.now().strftime('%Y%m%d_%H%M%S'))
-        save_path = f"./{args.output_dir}_{timestamp}_{args.exp_name}/"
+        save_path = f"{args.output_dir}_{timestamp}_{args.exp_name}/"
         Path(save_path).mkdir(exist_ok=True, parents=True)
         args.save_dir = str(save_path)
+        args.k_fold = getattr(args, 'k_fold', 1)
         
         return args
 

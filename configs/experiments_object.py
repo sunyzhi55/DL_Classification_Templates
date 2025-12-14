@@ -8,9 +8,9 @@ experiments = {
         # Model Configuration
         # ==============================================================================
         "model_name": "resnet34",
-        "pretrained_path": None,
+        "pretrained_path": None, # Path to pretrained weights
         "num_classes": 102,  # Number of classes
-        "checkpoint_path": None,
+        "checkpoint_path": None, # Path to checkpoint for resuming training
         
         # ==============================================================================
         # Dataset Configuration
@@ -48,6 +48,8 @@ experiments = {
         "lr_policy": "onecycle", 
         "lr_decay": 0.95,  # initial lambda decay value
         "niter": 50,  # lr decay step
+        "lr_decay_iters": 30, # step size for StepLR
+        
 
         # ==============================================================================
         # System & Output Configuration
@@ -69,9 +71,9 @@ experiments = {
         # Model Configuration
         # ==============================================================================
         "model_name": "resnet34",
-        "pretrained_path": None,
+        "pretrained_path": None, # Path to pretrained weights
         "num_classes": 10,  # Number of classes
-        "checkpoint_path": None,
+        "checkpoint_path": None, # Path to checkpoint for resuming training
         
         # ==============================================================================
         # Dataset Configuration
@@ -109,6 +111,7 @@ experiments = {
         "lr_policy": "onecycle", 
         "lr_decay": 0.95,  # initial lambda decay value
         "niter": 50,  # lr decay step
+        "lr_decay_iters": 30, # step size for StepLR
 
         # ==============================================================================
         # System & Output Configuration
@@ -130,9 +133,9 @@ experiments = {
         # Model Configuration
         # ==============================================================================
         "model_name": "resnet34",
-        "pretrained_path": None,
+        "pretrained_path": None, # Path to pretrained weights
         "num_classes": 100,  # Number of classes
-        "checkpoint_path": None,
+        "checkpoint_path": None, # Path to checkpoint for resuming training
 
         
         # ==============================================================================
@@ -171,6 +174,7 @@ experiments = {
         "lr_policy": "onecycle", 
         "lr_decay": 0.95,  # initial lambda decay value
         "niter": 50,  # lr decay step
+        "lr_decay_iters": 30, # step size for StepLR
 
         # ==============================================================================
         # System & Output Configuration

@@ -58,7 +58,7 @@ class RuntimeObserver:
         :param task: 'binary' or 'multiclass'
         :param average: Averaging mode for metrics
         :param patience: Early stopping patience
-        :param kwargs: Optional metadata (experiment name, random seed, hyperparameters)
+        :param kwargs: Optional metadata (hyperparameters)
         """
         self.log_dir = str(log_dir)
         self.log_file = self.log_dir + 'log.txt'

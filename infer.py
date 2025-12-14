@@ -5,6 +5,7 @@ from PIL import Image
 from torchvision import transforms
 from models.get_model import get_model
 from utils.reproducibility import set_global_seed
+from data.dataset import get_transforms
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -17,7 +18,7 @@ def parse_args():
     parser.add_argument('--img_size', type=int, default=224)
     parser.add_argument('--topk', type=int, default=5)
     parser.add_argument('--model_name', type=str, default='resnet34')
-    parser.add_argument('--device', type=str, default='cpu')
+    parser.add_argument('--device', type=str, default='cuda:0')
     parser.add_argument('--num_classes', type=int, default=102)
     parser.add_argument('--seed', type=int, default=42, help='Random seed for reproducibility')
     return parser.parse_args()
@@ -51,8 +52,12 @@ if __name__ == '__main__':
     
     device = torch.device(args.device if torch.cuda.is_available() else 'cpu')
 
+    checkpoint_path = Path(args.checkpoint)
+    if not checkpoint_path.exists():
+        raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+
     model = get_model(args.model_name, args.num_classes, args.checkpoint, device)
-    model.load_state_dict(torch.load(args.checkpoint, map_location=device))
+    model.load_state_dict(torch.load(checkpoint_path, map_location=device))
     model = model.to(device)
     model.eval()
 

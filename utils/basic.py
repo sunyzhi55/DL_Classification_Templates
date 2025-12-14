@@ -9,14 +9,13 @@ from torch.optim import lr_scheduler
 
 def get_optimizer(optimizer_name, parameters, **kwargs):
     """
-    获取优化器实例
+    Get optimizer by name
 
     Args:
+        optimizer_name: 优化器名称（如 'Adam', 'SGD', 'RMSprop', 'Adadelta'）
         parameters: 模型参数
         lr: 学习率
         weight_decay: 权重衰减
-        optimizer_name: 优化器名称（如 'Adam', 'SGD', 'RMSprop', 'Adadelta'）
-
     Returns:
         optimizer: 对应的优化器实例
     """
@@ -52,16 +51,22 @@ def get_scheduler(optimizer, opt, train_loader=None):
         scheduler: 对应的学习率调度器
     """
 
-    if opt.lr_policy == 'lambda':
+    policy = getattr(opt, 'lr_policy', 'onecycle')
+    total_epochs = getattr(opt, 'epochs', 100)
+    if policy == 'lambda':
+        warm_epochs = getattr(opt, 'niter', max(total_epochs // 2, 1))
+        decay_epochs = getattr(opt, 'niter_decay', max(total_epochs - warm_epochs, 1))
+
         def lambda_rule(epoch):
-            lr_l = 1.0 - max(0, epoch - opt.niter) / float(opt.niter_decay + 1)
+            lr_l = 1.0 - max(0, epoch - warm_epochs) / float(decay_epochs + 1)
             return lr_l
         scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_rule)
 
-    elif opt.lr_policy == 'step':
-        scheduler = lr_scheduler.StepLR(optimizer, step_size=opt.lr_decay_iters, gamma=0.1)
+    elif policy == 'step':
+        step_size = getattr(opt, 'lr_decay_iters', getattr(opt, 'niter', 30))
+        scheduler = lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.1)
 
-    elif opt.lr_policy == 'plateau':
+    elif policy == 'plateau':
         scheduler = lr_scheduler.ReduceLROnPlateau(
             optimizer,
             mode='min',
@@ -70,23 +75,20 @@ def get_scheduler(optimizer, opt, train_loader=None):
             patience=5
         )
 
-    elif opt.lr_policy == 'cosine':
+    elif policy == 'cosine':
         scheduler = lr_scheduler.CosineAnnealingWarmRestarts(
             optimizer,
             T_0=10,
             T_mult=3,
-            eta_min=0.00001
+            eta_min=1e-5
         )
 
-    elif opt.lr_policy == 'exp':
-        scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=opt.lr_decay)
+    elif policy == 'exp':
+        scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=getattr(opt, 'lr_decay', 0.95))
 
-    elif opt.lr_policy == 'onecycle':
+    elif policy == 'onecycle':
         if train_loader is None:
             raise ValueError("❌ OneCycleLR 策略需要传入 train_loader 参数以计算 steps_per_epoch")
-        if not hasattr(opt, "epochs"):
-            raise ValueError("❌ OneCycleLR 策略需要 opt.epochs 参数")
-
         scheduler = lr_scheduler.OneCycleLR(
             optimizer,
             max_lr=opt.lr * 5,  # 峰值学习率（通常为初始lr的3~10倍）
@@ -100,7 +102,7 @@ def get_scheduler(optimizer, opt, train_loader=None):
         )
 
     else:
-        raise NotImplementedError(f'learning rate policy [{opt.lr_policy}] is not implemented')
+        raise NotImplementedError(f'learning rate policy [{policy}] is not implemented')
 
     return scheduler
 
