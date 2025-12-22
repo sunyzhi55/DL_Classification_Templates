@@ -7,10 +7,10 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 import torch
 class ImageFolderDictDataset(Dataset):
-    def __init__(self, root_dir, transform=None, extensions=(".jpg", ".jpeg", ".png")):
+    def __init__(self, img_dir, labels_file = None, transform=None, extensions=(".jpg", ".jpeg", ".png")):
         """
         一个通用的图像分类Dataset类，加载结构为：
-            root_dir/
+            img_dir/
                 class1/
                     xxx.jpg
                     yyy.png
@@ -18,34 +18,30 @@ class ImageFolderDictDataset(Dataset):
                     zzz.jpg
                     ...
         Args:
-            root_dir (str or Path): 数据集根目录。
+            img_dir (str or Path): 数据集根目录。
             transform (callable, optional): 图像预处理变换（如Resize、ToTensor、Normalize等）。
             extensions (tuple): 允许的图片扩展名。
         """
-        self.root_dir = Path(root_dir)
+        self.img_dir = Path(img_dir)
         self.extensions = extensions
 
         # 收集类别名称（子文件夹名）
-        self.classes = sorted([d.name for d in self.root_dir.iterdir() if d.is_dir()])
+        self.classes = sorted([d.name for d in self.img_dir.iterdir() if d.is_dir()])
         self.class_to_idx = {cls_name: idx for idx, cls_name in enumerate(self.classes)}
 
         # 收集所有图片路径及对应标签
         self.samples = []
         for cls_name in self.classes:
-            cls_dir = self.root_dir / cls_name
+            cls_dir = self.img_dir / cls_name
             for img_path in cls_dir.glob("*"):
                 if img_path.suffix.lower() in self.extensions:
                     self.samples.append((img_path, self.class_to_idx[cls_name]))
 
         if not self.samples:
-            raise RuntimeError(f"未在 {self.root_dir} 下找到任何图片，请检查路径或扩展名设置。")
+            raise RuntimeError(f"未在 {self.img_dir} 下找到任何图片，请检查路径或扩展名设置。")
 
         # 默认 transform
-        self.transform = transform or transforms.Compose([
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-        ])
+        self.transform = transform
 
     def __len__(self):
         return len(self.samples)
@@ -58,7 +54,7 @@ class ImageFolderDictDataset(Dataset):
             image = self.transform(image)
 
         batch = {
-            "image": image.float(),
+            "image": image,
             "label": label,
             "path": str(img_path),
             "class_name": self.classes[label]
